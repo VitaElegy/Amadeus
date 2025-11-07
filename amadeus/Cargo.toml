@@ -1,0 +1,8 @@
+[package]
+name = "amadeus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iceoryx2 = "0.4"     # 零拷贝进程间通信
+anyhow = "1.0"       # 错误处理
