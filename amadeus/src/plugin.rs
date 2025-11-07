@@ -100,6 +100,20 @@ impl PluginRegistry {
         }
     }
 
+    /// 创建插件注册表并自动加载所有启用的插件
+    pub fn with_enabled_plugins(plugins: Vec<Box<dyn Plugin>>) -> Self {
+        let mut registry = Self::new();
+        registry.register_enabled(plugins);
+        registry
+    }
+
+    /// 创建插件注册表并加载所有插件（无论是否启用）
+    pub fn with_all_plugins(plugins: Vec<Box<dyn Plugin>>) -> Self {
+        let mut registry = Self::new();
+        registry.register_all(plugins);
+        registry
+    }
+
     /// 从配置文件加载插件元数据
     /// 
     /// # 示例
@@ -128,6 +142,56 @@ impl PluginRegistry {
         self.plugins.push(Box::new(plugin));
     }
 
+    /// 批量注册插件列表
+    pub fn register_all(&mut self, plugins: Vec<Box<dyn Plugin>>) {
+        for plugin in plugins {
+            println!("注册插件: {}", plugin.metadata().name);
+            self.plugins.push(plugin);
+        }
+    }
+
+    /// 根据配置有选择地注册插件
+    /// 
+    /// 只注册那些 enabled_by_default 为 true 的插件
+    pub fn register_enabled(&mut self, plugins: Vec<Box<dyn Plugin>>) {
+        for plugin in plugins {
+            let enabled = plugin.metadata().enabled_by_default;
+            let name = plugin.metadata().name.clone();
+            
+            if enabled {
+                println!("✓ 注册插件: {} [启用]", name);
+                self.plugins.push(plugin);
+            } else {
+                println!("✗ 跳过插件: {} [禁用]", name);
+            }
+        }
+    }
+
+    /// 注册匹配名称的插件
+    pub fn register_by_names(&mut self, plugins: Vec<Box<dyn Plugin>>, names: &[&str]) {
+        for plugin in plugins {
+            let name = &plugin.metadata().name;
+            if names.contains(&name.as_str()) {
+                println!("✓ 注册插件: {}", name);
+                self.plugins.push(plugin);
+            }
+        }
+    }
+
+    /// 注册匹配过滤器的插件
+    pub fn register_filtered<F>(&mut self, plugins: Vec<Box<dyn Plugin>>, filter: F)
+    where
+        F: Fn(&PluginMetadata) -> bool,
+    {
+        for plugin in plugins {
+            let meta = plugin.metadata();
+            if filter(meta) {
+                println!("✓ 注册插件: {}", meta.name);
+                self.plugins.push(plugin);
+            }
+        }
+    }
+
     /// 获取所有插件
     pub fn plugins(&self) -> &[Box<dyn Plugin>] {
         &self.plugins
@@ -138,49 +202,48 @@ impl PluginRegistry {
         &mut self.plugins
     }
 
-    /// 初始化所有启用的插件
-    pub fn init_all(&mut self) -> anyhow::Result<()> {
+    /// 初始化所有插件
+    pub fn init_all(&mut self) -> anyhow::Result<&mut Self> {
         println!("\n=== 初始化所有插件 ===");
         for plugin in self.plugins.iter_mut() {
-            if plugin.is_enabled() {
-                plugin.init()?;
-            } else {
-                println!("[{}] 插件已禁用，跳过初始化", plugin.metadata().name);
-            }
+            plugin.init()?;
         }
-        Ok(())
+        Ok(self)
     }
 
-    /// 启动所有启用的插件
-    pub fn start_all(&mut self) -> anyhow::Result<()> {
+    /// 启动所有插件
+    pub fn start_all(&mut self) -> anyhow::Result<&mut Self> {
         println!("\n=== 启动所有插件 ===");
         for plugin in self.plugins.iter_mut() {
-            if plugin.is_enabled() {
-                plugin.start()?;
-            }
+            plugin.start()?;
         }
-        Ok(())
+        Ok(self)
     }
 
-    /// 运行所有启用的插件
-    pub fn run_all(&mut self) -> anyhow::Result<()> {
+    /// 运行所有插件
+    pub fn run_all(&mut self) -> anyhow::Result<&mut Self> {
         println!("\n=== 运行所有插件 ===");
         for plugin in self.plugins.iter_mut() {
-            if plugin.is_enabled() {
-                plugin.run()?;
-            }
+            plugin.run()?;
         }
-        Ok(())
+        Ok(self)
     }
 
-    /// 停止所有启用的插件
-    pub fn stop_all(&mut self) -> anyhow::Result<()> {
+    /// 停止所有插件（按相反顺序）
+    pub fn stop_all(&mut self) -> anyhow::Result<&mut Self> {
         println!("\n=== 停止所有插件 ===");
         for plugin in self.plugins.iter_mut().rev() {
-            if plugin.is_enabled() {
-                plugin.stop()?;
-            }
+            plugin.stop()?;
         }
+        Ok(self)
+    }
+
+    /// 执行完整的插件生命周期
+    pub fn run_lifecycle(&mut self) -> anyhow::Result<()> {
+        self.init_all()?
+            .start_all()?
+            .run_all()?
+            .stop_all()?;
         Ok(())
     }
 
