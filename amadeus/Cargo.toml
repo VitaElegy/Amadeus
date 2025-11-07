@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 iceoryx2 = "0.4"     # 零拷贝进程间通信
 anyhow = "1.0"       # 错误处理
+serde = { version = "1.0", features = ["derive"] }  # 序列化/反序列化
+serde_json = "1.0"   # JSON 支持

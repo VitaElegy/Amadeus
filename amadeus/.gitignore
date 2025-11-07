@@ -1,0 +1,51 @@
+# Rust 编译产物
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# 配置文件（保留示例文件）
+plugins_config.json
+!plugins_config.example.json
+
+# IDE 配置
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# 日志文件
+*.log
+logs/
+
+# 测试覆盖率
+tarpaulin-report.html
+cobertura.xml
+
+# 文档生成
+/doc/
+/docs/target/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+
