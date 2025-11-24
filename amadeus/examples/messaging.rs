@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
         // 注册 Iceoryx2 分发器
         let dispatcher = Iceoryx2Dispatcher::new("amadeus_service")
             .with_name("Iceoryx2分发器");
-        msg_mgr.register_dispatcher(dispatcher);
+        msg_mgr.register_dispatcher(dispatcher).await;
     }
 
     // 运行应用
@@ -41,7 +41,7 @@ async fn demonstrate_messaging() -> Result<()> {
 
     // 注册一个分发器
     let dispatcher = Iceoryx2Dispatcher::new("demo_service");
-    msg_mgr.register_dispatcher(dispatcher);
+    msg_mgr.register_dispatcher(dispatcher).await;
 
     // 启动分发器
     msg_mgr.start_dispatchers().await?;

@@ -21,3 +21,8 @@ serde_json = "1.0"   # JSON 支持
 tokio = { version = "1.0", features = ["full"] }  # 异步运行时和通道
 tracing = "0.1.41"
 tracing-subscriber = "0.3.20"
+# New dependencies
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "tls-native-tls"] }
+tokio-cron-scheduler = "0.13"
+extism = "1.0"
+uuid = { version = "1.0", features = ["v4", "fast-rng"] }

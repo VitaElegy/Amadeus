@@ -106,6 +106,10 @@ impl App {
 
         // 如果启用了消息系统，设置插件的消息订阅并启动分发器
         if let Some(ref mut msg_mgr) = self.message_manager {
+            // 设置所有插件的消息订阅
+            // 这包括 CoreSystemPlugin，它需要这个步骤来初始化 Storage/Scheduler
+            self.registry.setup_messaging(msg_mgr).await?;
+
             // 启动消息处理循环
             msg_mgr.start_message_loop();
 
@@ -142,4 +146,3 @@ impl Default for App {
         Self::new()
     }
 }
-

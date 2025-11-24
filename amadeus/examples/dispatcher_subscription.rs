@@ -22,21 +22,21 @@ async fn main() -> Result<()> {
     let dispatcher1 = Iceoryx2Dispatcher::new("service1")
         .with_name("全量分发器");
     tracing::info!("  - {}: 订阅所有消息类型", dispatcher1.name());
-    msg_mgr.register_dispatcher(dispatcher1);
+    msg_mgr.register_dispatcher(dispatcher1).await;
 
     // 分发器2：只订阅 "notification" 类型
     let dispatcher2 = Iceoryx2Dispatcher::new("service2")
         .with_name("通知分发器")
         .subscribe_to(&["notification"]);
     tracing::info!("  - {}: 只订阅 'notification' 类型", dispatcher2.name());
-    msg_mgr.register_dispatcher(dispatcher2);
+    msg_mgr.register_dispatcher(dispatcher2).await;
 
     // 分发器3：订阅多个消息类型
     let dispatcher3 = Iceoryx2Dispatcher::new("service3")
         .with_name("多类型分发器")
         .subscribe_to(&["alert", "warning"]);
     tracing::info!("  - {}: 订阅 'alert' 和 'warning' 类型", dispatcher3.name());
-    msg_mgr.register_dispatcher(dispatcher3);
+    msg_mgr.register_dispatcher(dispatcher3).await;
 
     // 启动分发器
     msg_mgr.start_dispatchers().await?;

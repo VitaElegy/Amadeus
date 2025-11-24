@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
+use std::pin::Pin;
 use tokio::sync::mpsc;
 
 /// 插件元数据 - 可以被序列化到 JSON 配置文件
@@ -69,6 +70,19 @@ pub trait Plugin: Send + Sync {
         Ok(())
     }
 
+    /// 设置消息订阅
+    /// 
+    /// 插件可以在这里订阅感兴趣的消息类型
+    /// 返回一个 Future，因为订阅可能涉及异步操作
+    fn setup_messaging(
+        &mut self,
+        _distribution_center: &DistributionCenter,
+        _message_tx: mpsc::Sender<Message>,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Arc<MessageContext>>>> + Send>> {
+        // 默认实现：不订阅任何消息
+        Box::pin(async { Ok(None) })
+    }
+
     /// 启动插件 - 在插件开始运行前调用
     fn start(&mut self) -> anyhow::Result<()> {
         tracing::info!("[{}] 插件启动", self.metadata().name);
@@ -90,43 +104,6 @@ pub trait Plugin: Send + Sync {
     /// 获取插件是否启用
     fn is_enabled(&self) -> bool {
         self.metadata().enabled_by_default
-    }
-}
-
-/// 支持消息的插件 trait
-/// 
-/// 这是一个可选的扩展 trait，插件可以实现它来获得消息订阅和发送的能力
-/// 
-/// 注意：实现此 trait 的插件必须同时实现 Plugin trait
-/// 使用 tokio 的异步通道实现消息订阅和发送
-pub trait MessagePlugin: Plugin {
-    /// 设置消息订阅（在插件初始化时调用）
-    /// 
-    /// 插件可以在这里订阅感兴趣的消息类型
-    /// 
-    /// # 参数
-    /// - `distribution_center`: 分发中心的引用，用于订阅消息
-    /// - `message_tx`: 消息发送通道，用于发送消息
-    /// 
-    /// # 返回值
-    /// 返回消息上下文，插件可以使用它来订阅和发送消息
-    fn setup_messaging(
-        &mut self,
-        distribution_center: &DistributionCenter,
-        message_tx: mpsc::Sender<Message>,
-    ) -> impl Future<Output = anyhow::Result<Arc<MessageContext>>> + Send {
-        // 默认实现：创建消息上下文但不订阅任何消息
-        let plugin_name = self.metadata().name.clone();
-        let distribution_center = Arc::new(distribution_center.clone());
-        
-        async move {
-            let ctx = Arc::new(MessageContext::new(
-                distribution_center,
-                plugin_name,
-                message_tx,
-            ));
-            Ok(ctx)
-        }
     }
 }
 
@@ -158,19 +135,6 @@ impl PluginRegistry {
     }
 
     /// 从配置文件加载插件元数据
-    /// 
-    /// # 示例
-    /// ```no_run
-    /// use amadeus::plugin::PluginRegistry;
-    /// 
-    /// # fn main() -> anyhow::Result<()> {
-    /// let configs = PluginRegistry::load_config("plugins_config.json")?;
-    /// for config in configs {
-    ///     println!("加载插件配置: {}", config.name);
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn load_config(path: &str) -> anyhow::Result<Vec<PluginMetadata>> {
         let content = std::fs::read_to_string(path)?;
         let metadata: Vec<PluginMetadata> = serde_json::from_str(&content)?;
@@ -199,8 +163,6 @@ impl PluginRegistry {
     }
 
     /// 根据配置有选择地注册插件
-    /// 
-    /// 只注册那些 enabled_by_default 为 true 的插件
     pub fn register_enabled(&mut self, plugins: Vec<Box<dyn Plugin>>) {
         for plugin in plugins {
             let enabled = plugin.metadata().enabled_by_default;
@@ -321,26 +283,39 @@ impl PluginRegistry {
         }
     }
 
-    /// 设置插件的消息订阅（如果插件实现了 MessagePlugin）
-    /// 
-    /// 注意：由于 Rust 的类型系统限制，此方法需要插件在注册时明确类型
-    /// 或者使用类型擦除技术。这里提供一个基础框架。
-    /// 
-    /// 实际使用中，如果插件实现了 MessagePlugin，应该在插件的 init() 或 start() 方法中
-    /// 通过其他方式（如全局注册表或依赖注入）获取分发中心并设置订阅
-    pub fn setup_messaging(
+    /// 设置插件的消息订阅
+    pub async fn setup_messaging(
         &mut self,
-        _message_manager: &crate::message_manager::MessageManager,
+        message_manager: &crate::message_manager::MessageManager,
     ) -> anyhow::Result<()> {
         tracing::info!("=== 设置插件消息订阅 ===");
         
-        // 遍历所有插件，尝试设置消息订阅
-        // 注意：由于 trait object 的限制，这里无法直接检查插件是否实现了 MessagePlugin
-        // 实际使用中，需要使用 MessagePluginWrapper 或者类型擦除
-        
-        // 这里提供一个占位实现，实际使用时需要根据具体的设计模式来实现
-        // 如果插件被包装在 MessagePluginWrapper 中，可以在这里设置
-        // 或者插件在 init/start 时通过其他方式获取分发中心
+        let dc = message_manager.distribution_center();
+        let tx = message_manager.message_tx();
+
+        for plugin in self.plugins.iter_mut() {
+            // 调用每个插件的 setup_messaging
+            // 因为我们现在统一了接口，所以可以直接调用
+            match plugin.setup_messaging(dc, tx.clone()).await {
+                Ok(Some(ctx)) => {
+                    tracing::info!("✓ 插件 {} 消息订阅已配置", plugin.metadata().name);
+                    // 这里可能需要保存 ctx，但目前 MessageContext 主要用于订阅时的生命周期管理
+                    // 如果插件自己管理了 handle，那么这里不需要做额外的事情
+                    // 通常插件会在 setup_messaging 里 spawn 任务
+                    
+                    // 为了保持 context 存活（如果需要），我们可能需要将其 attach 到插件
+                    // 但由于 dyn Plugin 不知道具体的结构，我们假设 setup_messaging 内部处理好了所有事情
+                    // (例如 CoreSystemPlugin 将 ctx 存入了自己的结构体)
+                    drop(ctx); 
+                }
+                Ok(None) => {
+                    // 插件不需要消息功能
+                }
+                Err(e) => {
+                    tracing::error!("✗ 插件 {} 消息订阅配置失败: {}", plugin.metadata().name, e);
+                }
+            }
+        }
         
         Ok(())
     }
@@ -351,4 +326,3 @@ impl Default for PluginRegistry {
         Self::new()
     }
 }
-
