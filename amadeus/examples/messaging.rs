@@ -10,7 +10,8 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("=== Amadeus 消息系统示例（使用 tokio）===\n");
+    tracing_subscriber::fmt::init();
+    tracing::info!("=== Amadeus 消息系统示例（使用 tokio）===");
 
     // 创建应用并启用消息系统
     let mut app = App::new()
@@ -29,7 +30,7 @@ async fn main() -> Result<()> {
     app.run_async().await?;
 
     // 演示消息发送和接收
-    println!("\n=== 消息系统演示 ===");
+    tracing::info!("=== 消息系统演示 ===");
     demonstrate_messaging().await?;
 
     Ok(())
@@ -42,14 +43,14 @@ async fn demonstrate_messaging() -> Result<()> {
     let dispatcher = Iceoryx2Dispatcher::new("demo_service");
     msg_mgr.register_dispatcher(dispatcher);
 
-        // 启动分发器
-        msg_mgr.start_dispatchers().await?;
+    // 启动分发器
+    msg_mgr.start_dispatchers().await?;
 
     // 启动消息处理循环
     msg_mgr.start_message_loop();
 
     // 模拟外部消息到达
-    println!("\n1. 模拟外部消息到达...");
+    tracing::info!("1. 模拟外部消息到达...");
     let external_message = Message::from_external(
         "command",
         json!({
@@ -65,7 +66,7 @@ async fn demonstrate_messaging() -> Result<()> {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // 模拟插件发送消息
-    println!("\n2. 模拟插件发送消息...");
+    tracing::info!("2. 模拟插件发送消息...");
     let plugin_message = Message::from_plugin(
         "notification",
         json!({
@@ -81,13 +82,13 @@ async fn demonstrate_messaging() -> Result<()> {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // 显示订阅统计
-    println!("\n3. 订阅统计:");
+    tracing::info!("3. 订阅统计:");
     let stats = msg_mgr.distribution_center().get_subscription_stats().await;
     if stats.is_empty() {
-        println!("   (暂无订阅)");
+        tracing::info!("   (暂无订阅)");
     } else {
         for (msg_type, count) in stats {
-            println!("   {}: {} 个订阅者", msg_type, count);
+            tracing::info!("   {}: {} 个订阅者", msg_type, count);
         }
     }
 

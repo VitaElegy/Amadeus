@@ -1,7 +1,9 @@
 use amadeus::App;
 
 fn main() -> anyhow::Result<()> {
-    // 创建应用并运行 - 所有配置都通过链式调用完成
+    tracing_subscriber::fmt::init();
+    
+    // Create app and run - all configuration via method chaining
     App::new()
         .show_metadata(true)
         .run()

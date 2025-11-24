@@ -65,25 +65,25 @@ pub trait Plugin: Send + Sync {
 
     /// 初始化插件 - 在插件加载时调用
     fn init(&mut self) -> anyhow::Result<()> {
-        println!("[{}] 插件初始化", self.metadata().name);
+        tracing::info!("[{}] 插件初始化", self.metadata().name);
         Ok(())
     }
 
     /// 启动插件 - 在插件开始运行前调用
     fn start(&mut self) -> anyhow::Result<()> {
-        println!("[{}] 插件启动", self.metadata().name);
+        tracing::info!("[{}] 插件启动", self.metadata().name);
         Ok(())
     }
 
     /// 运行插件 - 插件的主要逻辑
     fn run(&mut self) -> anyhow::Result<()> {
-        println!("[{}] 插件运行中", self.metadata().name);
+        tracing::info!("[{}] 插件运行中", self.metadata().name);
         Ok(())
     }
 
     /// 停止插件 - 在插件停止时调用，用于清理资源
     fn stop(&mut self) -> anyhow::Result<()> {
-        println!("[{}] 插件停止", self.metadata().name);
+        tracing::info!("[{}] 插件停止", self.metadata().name);
         Ok(())
     }
 
@@ -161,10 +161,15 @@ impl PluginRegistry {
     /// 
     /// # 示例
     /// ```no_run
+    /// use amadeus::plugin::PluginRegistry;
+    /// 
+    /// # fn main() -> anyhow::Result<()> {
     /// let configs = PluginRegistry::load_config("plugins_config.json")?;
     /// for config in configs {
     ///     println!("加载插件配置: {}", config.name);
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn load_config(path: &str) -> anyhow::Result<Vec<PluginMetadata>> {
         let content = std::fs::read_to_string(path)?;
@@ -181,14 +186,14 @@ impl PluginRegistry {
 
     /// 注册一个插件
     pub fn register<P: Plugin + 'static>(&mut self, plugin: P) {
-        println!("注册插件: {}", plugin.metadata().name);
+        tracing::info!("注册插件: {}", plugin.metadata().name);
         self.plugins.push(Box::new(plugin));
     }
 
     /// 批量注册插件列表
     pub fn register_all(&mut self, plugins: Vec<Box<dyn Plugin>>) {
         for plugin in plugins {
-            println!("注册插件: {}", plugin.metadata().name);
+            tracing::info!("注册插件: {}", plugin.metadata().name);
             self.plugins.push(plugin);
         }
     }
@@ -202,10 +207,10 @@ impl PluginRegistry {
             let name = plugin.metadata().name.clone();
             
             if enabled {
-                println!("✓ 注册插件: {} [启用]", name);
+                tracing::info!("✓ 注册插件: {} [启用]", name);
                 self.plugins.push(plugin);
             } else {
-                println!("✗ 跳过插件: {} [禁用]", name);
+                tracing::info!("✗ 跳过插件: {} [禁用]", name);
             }
         }
     }
@@ -215,7 +220,7 @@ impl PluginRegistry {
         for plugin in plugins {
             let name = &plugin.metadata().name;
             if names.contains(&name.as_str()) {
-                println!("✓ 注册插件: {}", name);
+                tracing::info!("✓ 注册插件: {}", name);
                 self.plugins.push(plugin);
             }
         }
@@ -229,7 +234,7 @@ impl PluginRegistry {
         for plugin in plugins {
             let meta = plugin.metadata();
             if filter(meta) {
-                println!("✓ 注册插件: {}", meta.name);
+                tracing::info!("✓ 注册插件: {}", meta.name);
                 self.plugins.push(plugin);
             }
         }
@@ -247,7 +252,7 @@ impl PluginRegistry {
 
     /// 初始化所有插件
     pub fn init_all(&mut self) -> anyhow::Result<&mut Self> {
-        println!("\n=== 初始化所有插件 ===");
+        tracing::info!("=== 初始化所有插件 ===");
         for plugin in self.plugins.iter_mut() {
             plugin.init()?;
         }
@@ -256,7 +261,7 @@ impl PluginRegistry {
 
     /// 启动所有插件
     pub fn start_all(&mut self) -> anyhow::Result<&mut Self> {
-        println!("\n=== 启动所有插件 ===");
+        tracing::info!("=== 启动所有插件 ===");
         for plugin in self.plugins.iter_mut() {
             plugin.start()?;
         }
@@ -265,7 +270,7 @@ impl PluginRegistry {
 
     /// 运行所有插件
     pub fn run_all(&mut self) -> anyhow::Result<&mut Self> {
-        println!("\n=== 运行所有插件 ===");
+        tracing::info!("=== 运行所有插件 ===");
         for plugin in self.plugins.iter_mut() {
             plugin.run()?;
         }
@@ -274,7 +279,7 @@ impl PluginRegistry {
 
     /// 停止所有插件（按相反顺序）
     pub fn stop_all(&mut self) -> anyhow::Result<&mut Self> {
-        println!("\n=== 停止所有插件 ===");
+        tracing::info!("=== 停止所有插件 ===");
         for plugin in self.plugins.iter_mut().rev() {
             plugin.stop()?;
         }
@@ -302,10 +307,10 @@ impl PluginRegistry {
 
     /// 列出所有插件
     pub fn list_plugins(&self) {
-        println!("\n=== 已注册的插件 ===");
+        tracing::info!("=== 已注册的插件 ===");
         for (idx, plugin) in self.plugins.iter().enumerate() {
             let meta = plugin.metadata();
-            println!(
+            tracing::info!(
                 "{}. {} v{} - {} [{}]",
                 idx + 1,
                 meta.name,
@@ -327,7 +332,7 @@ impl PluginRegistry {
         &mut self,
         _message_manager: &crate::message_manager::MessageManager,
     ) -> anyhow::Result<()> {
-        println!("\n=== 设置插件消息订阅 ===");
+        tracing::info!("=== 设置插件消息订阅 ===");
         
         // 遍历所有插件，尝试设置消息订阅
         // 注意：由于 trait object 的限制，这里无法直接检查插件是否实现了 MessagePlugin

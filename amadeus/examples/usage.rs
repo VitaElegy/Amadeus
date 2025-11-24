@@ -2,20 +2,23 @@
 // 运行: cargo run --example usage
 
 use amadeus::app::App;
-use amadeus::plugin::{Plugin, PluginRegistry};
+use amadeus::plugin::PluginRegistry;
 use amadeus::plugins;
 
 fn main() -> anyhow::Result<()> {
+    // Initialize tracing
+    tracing_subscriber::fmt::init();
+
     // ============================================
     // 方式 1: 最简洁的方式 - 只需一行代码！
     // ============================================
-    println!("=== 方式 1: 最简洁 ===\n");
+    tracing::info!("=== 方式 1: 最简洁 ===");
     App::new().show_metadata(false).run()?;
 
     // ============================================
     // 方式 2: 手动控制注册表
     // ============================================
-    println!("\n\n=== 方式 2: 手动控制 ===\n");
+    tracing::info!("\n=== 方式 2: 手动控制 ===");
     {
         let mut registry = PluginRegistry::with_enabled_plugins(
             plugins::get_all_plugins()
@@ -28,7 +31,7 @@ fn main() -> anyhow::Result<()> {
     // ============================================
     // 方式 3: 按名称过滤插件
     // ============================================
-    println!("\n\n=== 方式 3: 按名称过滤 ===\n");
+    tracing::info!("\n=== 方式 3: 按名称过滤 ===");
     {
         let mut registry = PluginRegistry::new();
         registry.register_by_names(
@@ -43,7 +46,7 @@ fn main() -> anyhow::Result<()> {
     // ============================================
     // 方式 4: 使用自定义过滤器
     // ============================================
-    println!("\n\n=== 方式 4: 自定义过滤器 ===\n");
+    tracing::info!("\n=== 方式 4: 自定义过滤器 ===");
     {
         let mut registry = PluginRegistry::new();
         
@@ -59,7 +62,7 @@ fn main() -> anyhow::Result<()> {
     // ============================================
     // 方式 5: 链式调用生命周期
     // ============================================
-    println!("\n\n=== 方式 5: 链式调用 ===\n");
+    tracing::info!("\n=== 方式 5: 链式调用 ===");
     {
         let mut registry = PluginRegistry::with_enabled_plugins(
             plugins::get_all_plugins()
@@ -74,4 +77,3 @@ fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-

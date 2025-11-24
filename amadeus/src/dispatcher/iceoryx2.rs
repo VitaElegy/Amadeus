@@ -61,6 +61,8 @@ impl Iceoryx2Dispatcher {
     /// 
     /// # 示例
     /// ```rust
+    /// use amadeus::dispatcher::iceoryx2::Iceoryx2Dispatcher;
+    /// 
     /// let dispatcher = Iceoryx2Dispatcher::new("node")
     ///     .subscribe_to(&["notification", "alert"]);
     /// ```
@@ -100,84 +102,59 @@ impl Dispatcher for Iceoryx2Dispatcher {
         // 启动后台发布任务（使用 std::thread，因为 Publisher 不是 Send）
         let handle = std::thread::spawn(move || {
             // 在后台线程中创建 iceoryx2 节点和发布者
-            let service_name_ref: &str = &service_name;
-            
-            let (node, mut publisher) = match NodeBuilder::new()
-                .create::<ipc::Service>()
-            {
-                Ok(node) => {
-                    let service_name_result: Result<_, _> = service_name_ref.try_into();
-                    match service_name_result {
-                        Ok(service_name) => {
-                            match node
-                                .service_builder(&service_name)
-                                .publish_subscribe::<AmadeusMessageData>()
-                                .open_or_create()
-                            {
-                                Ok(service) => {
-                                    match service.publisher_builder().create() {
-                                        Ok(pub_) => {
-                                            println!("[Iceoryx2Dispatcher] 已连接到服务: {} (节点: {})", 
-                                                     service_name, node_name);
-                                            (Some(node), Some(pub_))
-                                        }
-                                        Err(e) => {
-                                            eprintln!("[Iceoryx2Dispatcher] 创建发布者失败: {}", e);
-                                            (Some(node), None)
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("[Iceoryx2Dispatcher] 打开服务失败: {}", e);
-                                    (Some(node), None)
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("[Iceoryx2Dispatcher] 创建服务名称失败: {}", e);
-                            (Some(node), None)
-                        }
-                    }
-                }
-                Err(e) => {
-                    eprintln!("[Iceoryx2Dispatcher] 创建节点失败: {}", e);
-                    (None, None)
-                }
-            };
+            let task_result = (|| -> Result<()> {
+                let node = NodeBuilder::new()
+                    .create::<ipc::Service>()
+                    .map_err(|e| anyhow::anyhow!("创建节点失败: {}", e))?;
 
-            // 发布循环（使用阻塞接收）
-            while running.load(Ordering::Relaxed) {
-                // 使用阻塞接收，但设置超时以避免无限等待
-                match rx.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok(data) => {
-                        if let Some(ref mut pub_) = publisher {
-                            match pub_.loan_uninit() {
+                let service_name_obj = ServiceName::new(&service_name)
+                    .map_err(|e| anyhow::anyhow!("无效的服务名称: {}", e))?;
+
+                let service = node
+                    .service_builder(&service_name_obj)
+                    .publish_subscribe::<AmadeusMessageData>()
+                    .open_or_create()
+                    .map_err(|e| anyhow::anyhow!("打开或创建服务失败: {}", e))?;
+
+                let publisher = service.publisher_builder().create()
+                    .map_err(|e| anyhow::anyhow!("创建发布者失败: {}", e))?;
+
+                tracing::info!("[Iceoryx2Dispatcher] 已连接到服务: {} (节点: {})", service_name, node_name);
+
+                // 发布循环（使用阻塞接收）
+                while running.load(Ordering::Relaxed) {
+                    // 使用阻塞接收，但设置超时以避免无限等待
+                    match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                        Ok(data) => {
+                            match publisher.loan_uninit() {
                                 Ok(sample) => {
                                     let sample = sample.write_payload(data);
                                     if let Err(e) = sample.send() {
-                                        eprintln!("[Iceoryx2Dispatcher] 发送消息失败: {}", e);
+                                        tracing::error!("[Iceoryx2Dispatcher] 发送消息失败: {}", e);
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("[Iceoryx2Dispatcher] 获取样本失败: {}", e);
+                                    tracing::error!("[Iceoryx2Dispatcher] 获取样本失败: {}", e);
                                 }
                             }
                         }
-                    }
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                        // 超时，继续循环检查运行状态
-                    }
-                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                        // 通道已关闭，退出循环
-                        break;
+                        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                            // 超时，继续循环检查运行状态
+                        }
+                        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                            // 通道已关闭，退出循环
+                            break;
+                        }
                     }
                 }
-            }
+                Ok(())
+            })();
 
-            // 清理资源
-            drop(publisher);
-            drop(node);
-            println!("[Iceoryx2Dispatcher] 发布任务已停止");
+            if let Err(e) = task_result {
+                tracing::error!("[Iceoryx2Dispatcher] 后台任务异常退出: {:?}", e);
+            } else {
+                tracing::info!("[Iceoryx2Dispatcher] 发布任务已停止");
+            }
         });
 
         self.publisher_task_handle = Some(handle);
@@ -197,13 +174,13 @@ impl Dispatcher for Iceoryx2Dispatcher {
         drop(self.message_tx.take());
         
         // 等待任务完成
-        if let Some(_handle) = self.publisher_task_handle.take() {
-            // 注意：这里不能使用 await，因为 stop 是同步方法
-            // 任务会在接收到 running=false 信号后自动退出
-            // 在实际使用中，应该使用异步的 stop 方法
+        if let Some(handle) = self.publisher_task_handle.take() {
+            if handle.join().is_err() {
+                 tracing::error!("Failed to join publisher thread");
+            }
         }
         
-        println!("[{}] 已断开 Iceoryx2 服务连接", self.name);
+        tracing::info!("[{}] 已断开 Iceoryx2 服务连接", self.name);
         
         Ok(())
     }
