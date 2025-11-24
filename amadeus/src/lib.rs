@@ -3,6 +3,7 @@
 pub mod app;
 pub mod dispatcher;
 pub mod distribution_center;
+pub mod ipc;
 pub mod message;
 pub mod message_context;
 pub mod message_manager;

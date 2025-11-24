@@ -87,8 +87,8 @@ impl App {
         &mut self.registry
     }
 
-    /// 运行应用
-    pub fn run(mut self) -> Result<()> {
+    /// 异步运行应用
+    pub async fn run_async(mut self) -> Result<()> {
         if self.show_startup_message {
             println!("=== Amadeus 插件系统启动 ===\n");
         }
@@ -108,9 +108,9 @@ impl App {
         if let Some(ref mut msg_mgr) = self.message_manager {
             // 启动消息处理循环
             msg_mgr.start_message_loop();
-            
+
             // 启动分发器
-            msg_mgr.start_dispatchers()?;
+            msg_mgr.start_dispatchers().await?;
         }
 
         // 执行插件生命周期
@@ -118,19 +118,22 @@ impl App {
 
         // 停止分发器和消息循环
         if let Some(ref mut msg_mgr) = self.message_manager {
-            // 创建运行时以等待异步任务完成
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                msg_mgr.stop_message_loop().await;
-            });
-            msg_mgr.stop_dispatchers()?;
+            msg_mgr.stop_message_loop().await;
+            let _ = msg_mgr.stop_dispatchers().await;
         }
 
         if self.show_startup_message {
             println!("\n=== Amadeus 插件系统已关闭 ===");
         }
-        
+
         Ok(())
+    }
+
+    /// 运行应用（同步包装器）
+    pub fn run(self) -> Result<()> {
+        // 创建运行时以执行异步操作
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(self.run_async())
     }
 }
 

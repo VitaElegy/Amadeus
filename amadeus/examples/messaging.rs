@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     }
 
     // 运行应用
-    app.run()?;
+    app.run_async().await?;
 
     // 演示消息发送和接收
     println!("\n=== 消息系统演示 ===");
@@ -42,8 +42,8 @@ async fn demonstrate_messaging() -> Result<()> {
     let dispatcher = Iceoryx2Dispatcher::new("demo_service");
     msg_mgr.register_dispatcher(dispatcher);
 
-    // 启动分发器
-    msg_mgr.start_dispatchers()?;
+        // 启动分发器
+        msg_mgr.start_dispatchers().await?;
 
     // 启动消息处理循环
     msg_mgr.start_message_loop();
@@ -93,7 +93,7 @@ async fn demonstrate_messaging() -> Result<()> {
 
     // 停止消息循环和分发器
     msg_mgr.stop_message_loop().await;
-    msg_mgr.stop_dispatchers()?;
+    msg_mgr.stop_dispatchers().await?;
 
     Ok(())
 }

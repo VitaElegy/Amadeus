@@ -1,5 +1,6 @@
 use crate::dispatcher::{Dispatcher, DispatcherRegistry};
 use crate::distribution_center::DistributionCenter;
+use crate::ipc::Iceoryx2Receiver;
 use crate::message::Message;
 use anyhow::Result;
 use std::sync::Arc;
@@ -17,6 +18,8 @@ pub struct MessageManager {
     message_tx: mpsc::Sender<Message>,
     /// 消息处理任务句柄
     message_task_handle: Option<tokio::task::JoinHandle<()>>,
+    /// iceoryx2 接收器列表（用于从外部接收消息）
+    iceoryx2_receivers: Vec<Iceoryx2Receiver>,
 }
 
 impl MessageManager {
@@ -30,6 +33,7 @@ impl MessageManager {
             message_rx: Some(rx),
             message_tx: tx,
             message_task_handle: None,
+            iceoryx2_receivers: Vec::new(),
         }
     }
 
@@ -51,6 +55,34 @@ impl MessageManager {
     /// 注册分发器
     pub fn register_dispatcher<D: Dispatcher + 'static>(&mut self, dispatcher: D) {
         self.dispatcher_registry.register(dispatcher);
+    }
+
+    /// 注册 iceoryx2 接收器
+    /// 
+    /// 接收器将从 iceoryx2 服务接收消息并转发到消息管理器
+    /// 
+    /// # 参数
+    /// - `receiver`: 配置好的接收器（需要先设置 message_tx）
+    pub fn register_iceoryx2_receiver(&mut self, mut receiver: Iceoryx2Receiver) -> Result<()> {
+        // 设置消息发送通道
+        receiver = receiver.with_message_tx(self.message_tx.clone());
+        self.iceoryx2_receivers.push(receiver);
+        Ok(())
+    }
+
+    /// 启动所有 iceoryx2 接收器
+    pub async fn start_iceoryx2_receivers(&mut self) -> Result<()> {
+        for receiver in &mut self.iceoryx2_receivers {
+            receiver.start()?;
+        }
+        Ok(())
+    }
+
+    /// 停止所有 iceoryx2 接收器
+    pub async fn stop_iceoryx2_receivers(&mut self) {
+        for receiver in &mut self.iceoryx2_receivers {
+            receiver.stop().await;
+        }
     }
 
 
@@ -127,14 +159,20 @@ impl MessageManager {
         }
     }
 
-    /// 启动所有分发器
-    pub fn start_dispatchers(&mut self) -> Result<()> {
+    /// 启动所有分发器和接收器
+    pub async fn start_dispatchers(&mut self) -> Result<()> {
+        // 启动分发器
         self.dispatcher_registry.start_all()?;
+        // 启动 iceoryx2 接收器
+        self.start_iceoryx2_receivers().await?;
         Ok(())
     }
 
-    /// 停止所有分发器
-    pub fn stop_dispatchers(&mut self) -> Result<()> {
+    /// 停止所有分发器和接收器
+    pub async fn stop_dispatchers(&mut self) -> Result<()> {
+        // 停止 iceoryx2 接收器
+        self.stop_iceoryx2_receivers().await;
+        // 停止分发器
         self.dispatcher_registry.stop_all()?;
         Ok(())
     }
