@@ -1,5 +1,11 @@
+use crate::distribution_center::DistributionCenter;
+use crate::message::Message;
+use crate::message_context::MessageContext;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::future::Future;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 /// 插件元数据 - 可以被序列化到 JSON 配置文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,6 +90,43 @@ pub trait Plugin: Send + Sync {
     /// 获取插件是否启用
     fn is_enabled(&self) -> bool {
         self.metadata().enabled_by_default
+    }
+}
+
+/// 支持消息的插件 trait
+/// 
+/// 这是一个可选的扩展 trait，插件可以实现它来获得消息订阅和发送的能力
+/// 
+/// 注意：实现此 trait 的插件必须同时实现 Plugin trait
+/// 使用 tokio 的异步通道实现消息订阅和发送
+pub trait MessagePlugin: Plugin {
+    /// 设置消息订阅（在插件初始化时调用）
+    /// 
+    /// 插件可以在这里订阅感兴趣的消息类型
+    /// 
+    /// # 参数
+    /// - `distribution_center`: 分发中心的引用，用于订阅消息
+    /// - `message_tx`: 消息发送通道，用于发送消息
+    /// 
+    /// # 返回值
+    /// 返回消息上下文，插件可以使用它来订阅和发送消息
+    fn setup_messaging(
+        &mut self,
+        distribution_center: &DistributionCenter,
+        message_tx: mpsc::Sender<Message>,
+    ) -> impl Future<Output = anyhow::Result<Arc<MessageContext>>> + Send {
+        // 默认实现：创建消息上下文但不订阅任何消息
+        let plugin_name = self.metadata().name.clone();
+        let distribution_center = Arc::new(distribution_center.clone());
+        
+        async move {
+            let ctx = Arc::new(MessageContext::new(
+                distribution_center,
+                plugin_name,
+                message_tx,
+            ));
+            Ok(ctx)
+        }
     }
 }
 
@@ -271,6 +314,30 @@ impl PluginRegistry {
                 if meta.enabled_by_default { "启用" } else { "禁用" }
             );
         }
+    }
+
+    /// 设置插件的消息订阅（如果插件实现了 MessagePlugin）
+    /// 
+    /// 注意：由于 Rust 的类型系统限制，此方法需要插件在注册时明确类型
+    /// 或者使用类型擦除技术。这里提供一个基础框架。
+    /// 
+    /// 实际使用中，如果插件实现了 MessagePlugin，应该在插件的 init() 或 start() 方法中
+    /// 通过其他方式（如全局注册表或依赖注入）获取分发中心并设置订阅
+    pub fn setup_messaging(
+        &mut self,
+        _message_manager: &crate::message_manager::MessageManager,
+    ) -> anyhow::Result<()> {
+        println!("\n=== 设置插件消息订阅 ===");
+        
+        // 遍历所有插件，尝试设置消息订阅
+        // 注意：由于 trait object 的限制，这里无法直接检查插件是否实现了 MessagePlugin
+        // 实际使用中，需要使用 MessagePluginWrapper 或者类型擦除
+        
+        // 这里提供一个占位实现，实际使用时需要根据具体的设计模式来实现
+        // 如果插件被包装在 MessagePluginWrapper 中，可以在这里设置
+        // 或者插件在 init/start 时通过其他方式获取分发中心
+        
+        Ok(())
     }
 }
 

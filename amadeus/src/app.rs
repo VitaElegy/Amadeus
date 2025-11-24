@@ -1,3 +1,4 @@
+use crate::message_manager::MessageManager;
 use crate::plugin::{Plugin, PluginRegistry};
 use anyhow::Result;
 
@@ -6,6 +7,7 @@ use anyhow::Result;
 /// 提供更优雅的方式来配置和运行插件系统
 pub struct App {
     registry: PluginRegistry,
+    message_manager: Option<MessageManager>,
     show_metadata: bool,
     show_startup_message: bool,
 }
@@ -19,6 +21,7 @@ impl App {
         
         Self {
             registry,
+            message_manager: None,
             show_metadata: false,
             show_startup_message: true,
         }
@@ -30,6 +33,7 @@ impl App {
         
         Self {
             registry,
+            message_manager: None,
             show_metadata: false,
             show_startup_message: true,
         }
@@ -43,9 +47,27 @@ impl App {
         
         Self {
             registry,
+            message_manager: None,
             show_metadata: false,
             show_startup_message: true,
         }
+    }
+
+    /// 启用消息系统
+    pub fn with_messaging(mut self) -> Self {
+        self.message_manager = Some(MessageManager::new());
+        self
+    }
+
+    /// 使用自定义消息管理器
+    pub fn with_message_manager(mut self, manager: MessageManager) -> Self {
+        self.message_manager = Some(manager);
+        self
+    }
+
+    /// 获取消息管理器的可变引用
+    pub fn message_manager_mut(&mut self) -> Option<&mut MessageManager> {
+        self.message_manager.as_mut()
     }
 
     /// 设置是否显示元数据
@@ -82,8 +104,27 @@ impl App {
             }
         }
 
+        // 如果启用了消息系统，设置插件的消息订阅并启动分发器
+        if let Some(ref mut msg_mgr) = self.message_manager {
+            // 启动消息处理循环
+            msg_mgr.start_message_loop();
+            
+            // 启动分发器
+            msg_mgr.start_dispatchers()?;
+        }
+
         // 执行插件生命周期
         self.registry.run_lifecycle()?;
+
+        // 停止分发器和消息循环
+        if let Some(ref mut msg_mgr) = self.message_manager {
+            // 创建运行时以等待异步任务完成
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                msg_mgr.stop_message_loop().await;
+            });
+            msg_mgr.stop_dispatchers()?;
+        }
 
         if self.show_startup_message {
             println!("\n=== Amadeus 插件系统已关闭 ===");
