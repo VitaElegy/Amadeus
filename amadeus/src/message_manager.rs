@@ -98,10 +98,10 @@ impl MessageManager {
                     );
                 }
 
-                // 发送给所有分发器（让它们转发到外部）
+                // 发送给订阅了该消息类型的分发器（让它们转发到外部）
                 let registry = dispatcher_registry.lock().unwrap();
                 for dispatcher in registry.dispatchers() {
-                    if dispatcher.is_running() {
+                    if dispatcher.is_running() && dispatcher.is_subscribed_to(&message.message_type) {
                         if let Err(e) = dispatcher.send_message(&message) {
                             eprintln!(
                                 "[消息管理器] 分发器 {} 发送消息失败: {}",

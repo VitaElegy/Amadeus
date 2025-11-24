@@ -1,7 +1,8 @@
 pub mod iceoryx2;
 
-use crate::message::Message;
+use crate::message::{Message, MessageType};
 use anyhow::Result;
+use std::collections::HashSet;
 
 /// 分发器 trait
 /// 
@@ -25,6 +26,29 @@ pub trait Dispatcher: Send + Sync {
 
     /// 检查分发器是否正在运行
     fn is_running(&self) -> bool;
+
+    /// 获取分发器订阅的消息类型列表
+    /// 
+    /// 返回空集合表示订阅所有消息类型
+    /// 返回非空集合表示只订阅指定的消息类型
+    fn subscribed_message_types(&self) -> HashSet<MessageType> {
+        // 默认实现：订阅所有消息类型
+        HashSet::new()
+    }
+
+    /// 检查分发器是否订阅了指定的消息类型
+    /// 
+    /// # 参数
+    /// - `message_type`: 消息类型
+    /// 
+    /// # 返回值
+    /// - `true`: 如果订阅了该消息类型或订阅所有消息类型
+    /// - `false`: 如果没有订阅该消息类型
+    fn is_subscribed_to(&self, message_type: &MessageType) -> bool {
+        let subscribed = self.subscribed_message_types();
+        // 空集合表示订阅所有消息类型
+        subscribed.is_empty() || subscribed.contains(message_type)
+    }
 }
 
 /// 分发器注册表
