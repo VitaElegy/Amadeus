@@ -113,7 +113,7 @@ impl MessageManager {
                 for dispatcher in registry.dispatchers() {
                     if dispatcher.is_running() && dispatcher.is_subscribed_to(&message.message_type) {
                         if let Err(e) = dispatcher.send_message(&message) {
-                            eprintln!(
+                            tracing::error!(
                                 "[消息管理器] 分发器 {} 发送消息失败: {}",
                                 dispatcher.name(),
                                 e

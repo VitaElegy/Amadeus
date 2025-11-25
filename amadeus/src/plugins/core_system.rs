@@ -85,6 +85,11 @@ impl Plugin for CoreSystemPlugin {
                         Ok(msg) = rx_sched.recv() => {
                             handle_schedule_message(&msg, &scheduler_clone).await;
                         }
+                        else => {
+                            // All channels closed, exit gracefully
+                            tracing::info!("All message channels closed, stopping handler");
+                            break;
+                        }
                     }
                 }
             });

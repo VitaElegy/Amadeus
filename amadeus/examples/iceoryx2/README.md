@@ -83,61 +83,170 @@ python3 subscriber.py
 python3 test_integration.py
 ```
 
+### 5. `comprehensive_test.py` ⭐ **推荐**
+
+完整的系统功能测试套件，覆盖所有Amadeus功能模块：
+- ✅ 基础消息传递
+- ✅ 插件系统集成
+- ✅ 存储系统操作
+- ✅ 调度系统任务
+- ✅ 系统监控指标
+- ✅ 告警通知系统
+- ✅ 外部API集成
+- ✅ 高并发处理
+
+**运行方法：**
+```bash
+# 首先启动Rust测试服务
+cargo run --example system_test
+
+# 然后运行Python测试
+python3 comprehensive_test.py
+```
+
+### 6. `interactive_test.py` ⭐ **推荐**
+
+交互式的系统功能测试器，提供友好的菜单界面：
+- 🎮 菜单驱动的操作界面
+- 📤 发送各种类型的消息
+- 📊 实时监控消息传递
+- 📋 查看消息历史记录
+- 🔧 自定义消息发送
+
+**运行方法：**
+```bash
+# 首先启动Rust测试服务
+cargo run --example system_test
+
+# 然后运行交互式测试器
+python3 interactive_test.py
+```
+
+### 7. `run_comprehensive_test.sh` ⭐ **一键测试**
+
+自动化测试脚本，一键运行完整的系统测试：
+
+**运行方法：**
+```bash
+# 完整测试流程（推荐）
+./run_comprehensive_test.sh
+
+# 仅构建项目
+./run_comprehensive_test.sh --build-only
+
+# 仅运行Python测试（假设Rust服务已运行）
+./run_comprehensive_test.sh --python-only
+
+# 运行集成测试模式
+./run_comprehensive_test.sh --integration
+
+# 设置测试时长60秒
+./run_comprehensive_test.sh --duration 60
+
+# 启用详细日志
+./run_comprehensive_test.sh --verbose
+```
+
 ## 🚀 使用方法
 
-### 快速开始
+### 🚀 快速开始（推荐）
 
-最简单的开始方式：
+最简单的完整测试方式：
 
 ```bash
 cd examples/iceoryx2
-./run_test.sh
+
+# 一键运行完整系统测试
+./run_comprehensive_test.sh
 ```
 
-脚本会引导你完成：
-1. 自动安装 iceoryx2 Python 绑定
-2. 运行验证测试
-3. 选择测试模式（独立测试或完整系统测试）
+这个脚本会自动：
+1. ✅ 检查和安装所有依赖
+2. 🔨 构建Rust项目
+3. 🚀 启动测试服务
+4. 🧪 运行全面的功能测试
+5. 📊 生成详细的测试报告
 
-### 验证测试
+### 🎮 交互式测试
 
-运行快速验证：
+如果您想手动控制测试过程：
 
 ```bash
+# 终端1：启动Rust测试服务
+cd amadeus
+cargo run --example system_test
+
+# 终端2：运行交互式测试器
+cd examples/iceoryx2
+python3 interactive_test.py
+```
+
+交互式测试器提供菜单驱动的界面，让您可以：
+- 选择特定的功能模块进行测试
+- 发送自定义消息
+- 实时查看消息传递情况
+- 查看详细的消息历史
+
+### 🔧 传统测试方法
+
+如果需要基本的iceoryx2通信测试：
+
+```bash
+# 启动基础的Rust服务
+cd amadeus
+cargo run --example messaging
+
+# 运行基础的Python测试
+cd examples/iceoryx2
+python3 test_integration.py
+```
+
+### ⚡ 快速验证
+
+仅验证iceoryx2通信是否正常：
+
+```bash
+cd examples/iceoryx2
 python3 quick_test.py
 ```
 
-这会测试所有组件是否正常工作，无需启动完整的系统。
+## 📋 详细测试流程
 
-## 测试流程
-
-### 基本测试
-
-1. **启动 Rust Amadeus 分发器：**
-   ```bash
-   cd amadeus
-   cargo run --example messaging
-   ```
-
-2. **在新终端运行 Python 发布者：**
-   ```bash
-   cd examples/iceoryx2
-   python3 publisher.py
-   ```
-
-3. **在另一个终端运行 Python 订阅者：**
-   ```bash
-   cd examples/iceoryx2
-   python3 subscriber.py
-   ```
-
-### 集成测试
-
-直接运行集成测试：
+### 完整系统测试
 
 ```bash
+# 方式1：自动化脚本（推荐）
+./run_comprehensive_test.sh
+
+# 方式2：手动步骤
+cd amadeus
+cargo run --example system_test &
+cd examples/iceoryx2
+python3 comprehensive_test.py
+```
+
+### 基础通信测试
+
+```bash
+# 终端1：启动Rust服务
+cd amadeus
+cargo run --example messaging
+
+# 终端2：运行Python集成测试
 cd examples/iceoryx2
 python3 test_integration.py
+```
+
+### 自定义测试
+
+```bash
+# 启动Rust服务
+cd amadeus
+cargo run --example system_test
+
+# 使用交互式测试器进行自定义测试
+cd examples/iceoryx2
+python3 interactive_test.py
 ```
 
 ## 消息格式

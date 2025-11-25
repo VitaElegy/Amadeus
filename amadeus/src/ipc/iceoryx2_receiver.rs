@@ -71,7 +71,7 @@ impl Iceoryx2Receiver {
         // 启动接收任务（使用 std::thread，因为 Subscriber 不是 Send）
         let handle = std::thread::spawn(move || {
             if let Err(e) = Self::receive_loop(node_name, service_name, message_tx, running.clone()) {
-                eprintln!("[Iceoryx2Receiver] 接收循环错误: {}", e);
+                tracing::error!("[Iceoryx2Receiver] 接收循环错误: {}", e);
             }
             running.store(false, Ordering::Relaxed);
         });
@@ -79,7 +79,7 @@ impl Iceoryx2Receiver {
         self.receiver_task_handle = Some(handle);
         self.running.store(true, Ordering::Relaxed);
         
-        println!("[Iceoryx2Receiver] 已启动，服务: {}", self.service_name);
+        tracing::info!("[Iceoryx2Receiver] 已启动，服务: {}", self.service_name);
         Ok(())
     }
 
@@ -95,7 +95,7 @@ impl Iceoryx2Receiver {
             let _ = handle.join();
         }
         
-        println!("[Iceoryx2Receiver] 已停止");
+        tracing::info!("[Iceoryx2Receiver] 已停止");
     }
 
     /// 检查是否正在运行
@@ -125,7 +125,7 @@ impl Iceoryx2Receiver {
         // 创建订阅者
         let subscriber = service.subscriber_builder().create()?;
 
-        println!("[Iceoryx2Receiver] 已连接到服务: {}", service_name);
+        tracing::info!("[Iceoryx2Receiver] 已连接到服务: {}", service_name);
 
         // 接收循环
         while running.load(Ordering::Relaxed) {
@@ -137,12 +137,12 @@ impl Iceoryx2Receiver {
                         Ok(message) => {
                             // 发送到消息管理器（阻塞发送）
                             if let Err(e) = message_tx.blocking_send(message) {
-                                eprintln!("[Iceoryx2Receiver] 发送消息失败: {}", e);
+                                tracing::error!("[Iceoryx2Receiver] 发送消息失败: {}", e);
                                 break;
                             }
                         }
                         Err(e) => {
-                            eprintln!("[Iceoryx2Receiver] 消息转换失败: {}", e);
+                            tracing::error!("[Iceoryx2Receiver] 消息转换失败: {}", e);
                         }
                     }
                 }
@@ -151,7 +151,7 @@ impl Iceoryx2Receiver {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                 }
                 Err(e) => {
-                    eprintln!("[Iceoryx2Receiver] 接收消息错误: {}", e);
+                    tracing::error!("[Iceoryx2Receiver] 接收消息错误: {}", e);
                     // 短暂等待后重试
                     std::thread::sleep(std::time::Duration::from_millis(1000));
                 }

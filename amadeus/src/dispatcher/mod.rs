@@ -3,6 +3,7 @@ pub mod iceoryx2;
 use crate::message::{Message, MessageType};
 use anyhow::Result;
 use std::collections::HashSet;
+use tracing::{info, warn};
 
 /// 分发器 trait
 /// 
@@ -66,7 +67,7 @@ impl DispatcherRegistry {
 
     /// 注册分发器
     pub fn register<D: Dispatcher + 'static>(&mut self, dispatcher: D) {
-        println!("注册分发器: {}", dispatcher.name());
+        info!("注册分发器: {}", dispatcher.name());
         self.dispatchers.push(Box::new(dispatcher));
     }
 
@@ -82,20 +83,23 @@ impl DispatcherRegistry {
 
     /// 启动所有分发器
     pub fn start_all(&mut self) -> Result<()> {
-        println!("\n=== 启动所有分发器 ===");
+        info!("=== 启动所有分发器 ===");
         for dispatcher in self.dispatchers.iter_mut() {
             dispatcher.start()?;
-            println!("✓ 分发器 {} 已启动", dispatcher.name());
+            info!("✓ 分发器 {} 已启动", dispatcher.name());
         }
         Ok(())
     }
 
     /// 停止所有分发器
     pub fn stop_all(&mut self) -> Result<()> {
-        println!("\n=== 停止所有分发器 ===");
+        info!("=== 停止所有分发器 ===");
         for dispatcher in self.dispatchers.iter_mut().rev() {
-            dispatcher.stop()?;
-            println!("✓ 分发器 {} 已停止", dispatcher.name());
+            if let Err(e) = dispatcher.stop() {
+                warn!("! 分发器 {} 停止时出错: {}", dispatcher.name(), e);
+            } else {
+                info!("✓ 分发器 {} 已停止", dispatcher.name());
+            }
         }
         Ok(())
     }

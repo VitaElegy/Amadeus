@@ -37,6 +37,7 @@ name = "amadeus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "extism",
  "iceoryx2",
  "iceoryx2-bb-derive-macros",

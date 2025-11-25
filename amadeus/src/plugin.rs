@@ -89,12 +89,6 @@ pub trait Plugin: Send + Sync {
         Ok(())
     }
 
-    /// 运行插件 - 插件的主要逻辑
-    fn run(&mut self) -> anyhow::Result<()> {
-        tracing::info!("[{}] 插件运行中", self.metadata().name);
-        Ok(())
-    }
-
     /// 停止插件 - 在插件停止时调用，用于清理资源
     fn stop(&mut self) -> anyhow::Result<()> {
         tracing::info!("[{}] 插件停止", self.metadata().name);
@@ -230,15 +224,6 @@ impl PluginRegistry {
         Ok(self)
     }
 
-    /// 运行所有插件
-    pub fn run_all(&mut self) -> anyhow::Result<&mut Self> {
-        tracing::info!("=== 运行所有插件 ===");
-        for plugin in self.plugins.iter_mut() {
-            plugin.run()?;
-        }
-        Ok(self)
-    }
-
     /// 停止所有插件（按相反顺序）
     pub fn stop_all(&mut self) -> anyhow::Result<&mut Self> {
         tracing::info!("=== 停止所有插件 ===");
@@ -248,12 +233,16 @@ impl PluginRegistry {
         Ok(self)
     }
 
-    /// 执行完整的插件生命周期
-    pub fn run_lifecycle(&mut self) -> anyhow::Result<()> {
+    /// 执行插件启动流程 (init -> start)
+    pub fn startup(&mut self) -> anyhow::Result<()> {
         self.init_all()?
-            .start_all()?
-            .run_all()?
-            .stop_all()?;
+            .start_all()?;
+        Ok(())
+    }
+
+    /// 执行插件停止流程 (stop)
+    pub fn shutdown(&mut self) -> anyhow::Result<()> {
+        self.stop_all()?;
         Ok(())
     }
 

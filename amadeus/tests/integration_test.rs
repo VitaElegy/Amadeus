@@ -1,21 +1,22 @@
 use amadeus::plugin::{Plugin, PluginMetadata, PluginRegistry};
+use std::sync::{Arc, Mutex};
 
-struct TestPlugin {
-    metadata: PluginMetadata,
+struct TestState {
     init_called: bool,
     start_called: bool,
-    run_called: bool,
     stop_called: bool,
 }
 
+struct TestPlugin {
+    metadata: PluginMetadata,
+    state: Arc<Mutex<TestState>>,
+}
+
 impl TestPlugin {
-    fn new() -> Self {
+    fn new(state: Arc<Mutex<TestState>>) -> Self {
         Self {
             metadata: PluginMetadata::new("test_plugin", "A test plugin", "0.1.0"),
-            init_called: false,
-            start_called: false,
-            run_called: false,
-            stop_called: false,
+            state,
         }
     }
 }
@@ -26,22 +27,17 @@ impl Plugin for TestPlugin {
     }
 
     fn init(&mut self) -> anyhow::Result<()> {
-        self.init_called = true;
+        self.state.lock().unwrap().init_called = true;
         Ok(())
     }
 
     fn start(&mut self) -> anyhow::Result<()> {
-        self.start_called = true;
-        Ok(())
-    }
-
-    fn run(&mut self) -> anyhow::Result<()> {
-        self.run_called = true;
+        self.state.lock().unwrap().start_called = true;
         Ok(())
     }
 
     fn stop(&mut self) -> anyhow::Result<()> {
-        self.stop_called = true;
+        self.state.lock().unwrap().stop_called = true;
         Ok(())
     }
 }
@@ -69,24 +65,46 @@ fn test_plugin_lifecycle() -> anyhow::Result<()> {
     // Initialize tracing (optional, won't show in standard test output without --nocapture)
     let _ = tracing_subscriber::fmt::try_init();
 
-    let plugin = TestPlugin::new();
+    let state = Arc::new(Mutex::new(TestState {
+        init_called: false,
+        start_called: false,
+        stop_called: false,
+    }));
+
+    let plugin = TestPlugin::new(state.clone());
     let mut registry = PluginRegistry::new();
     registry.register(plugin);
 
-    // Run lifecycle
-    registry.run_lifecycle()?;
+    // Startup (Init -> Start)
+    registry.startup()?;
 
-    // Note: We can't easily check the internal state of the boxed plugin inside the registry
-    // without downcasting, which is complex. 
-    // However, if run_lifecycle returns Ok(()), it means all methods executed without error.
-    // To strictly verify calls, we would need interior mutability (RefCell/Arc<Mutex>) inside the plugin.
+    {
+        let s = state.lock().unwrap();
+        assert!(s.init_called, "Init should be called");
+        assert!(s.start_called, "Start should be called");
+        assert!(!s.stop_called, "Stop should NOT be called yet");
+    }
+
+    // Shutdown (Stop)
+    registry.shutdown()?;
+
+    {
+        let s = state.lock().unwrap();
+        assert!(s.stop_called, "Stop should be called");
+    }
     
     Ok(())
 }
 
 #[test]
 fn test_plugin_filtering() {
-    let p1 = TestPlugin::new();
+    let state = Arc::new(Mutex::new(TestState {
+        init_called: false,
+        start_called: false,
+        stop_called: false,
+    }));
+
+    let p1 = TestPlugin::new(state);
     
     let mut p2_meta = PluginMetadata::new("disabled_plugin", "Disabled", "0.1.0");
     p2_meta = p2_meta.enabled_by_default(false);
@@ -106,4 +124,3 @@ fn test_plugin_filtering() {
     assert_eq!(registry.plugins().len(), 1);
     assert_eq!(registry.plugins()[0].metadata().name, "test_plugin");
 }
-

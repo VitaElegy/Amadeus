@@ -53,7 +53,7 @@ impl Plugin for MessageExamplePlugin {
             
             tokio::spawn(async move {
                 while let Ok(msg) = rx.recv().await {
-                    println!("[MessageExample] 收到消息: {:?}", msg);
+                    tracing::info!("[MessageExample] 收到消息: {:?}", msg);
                 }
             });
 

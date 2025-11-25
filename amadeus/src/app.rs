@@ -90,7 +90,7 @@ impl App {
     /// 异步运行应用
     pub async fn run_async(mut self) -> Result<()> {
         if self.show_startup_message {
-            println!("=== Amadeus 插件系统启动 ===\n");
+            tracing::info!("=== Amadeus 插件系统启动 ===");
         }
 
         // 列出插件
@@ -99,8 +99,7 @@ impl App {
         // 可选：显示元数据
         if self.show_metadata {
             if let Ok(json) = self.registry.export_metadata() {
-                println!("\n=== 插件元数据 (JSON) ===");
-                println!("{}", json);
+                tracing::info!("=== 插件元数据 (JSON) ===\n{}", json);
             }
         }
 
@@ -117,8 +116,18 @@ impl App {
             msg_mgr.start_dispatchers().await?;
         }
 
-        // 执行插件生命周期
-        self.registry.run_lifecycle()?;
+        // 执行插件启动流程
+        self.registry.startup()?;
+
+        // 保持运行，直到收到停止信号
+        tracing::info!("服务正在运行... (按 Ctrl+C 停止)");
+        match tokio::signal::ctrl_c().await {
+            Ok(()) => tracing::info!("收到停止信号，正在关闭..."),
+            Err(err) => tracing::error!("监听信号失败: {}", err),
+        }
+
+        // 执行插件停止流程
+        self.registry.shutdown()?;
 
         // 停止分发器和消息循环
         if let Some(ref mut msg_mgr) = self.message_manager {
@@ -127,7 +136,7 @@ impl App {
         }
 
         if self.show_startup_message {
-            println!("\n=== Amadeus 插件系统已关闭 ===");
+            tracing::info!("=== Amadeus 插件系统已关闭 ===");
         }
 
         Ok(())
