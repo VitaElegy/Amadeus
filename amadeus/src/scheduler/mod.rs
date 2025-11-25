@@ -44,6 +44,12 @@ impl Scheduler {
         Ok(guid)
     }
 
+    /// Remove a scheduled job
+    pub async fn remove_job(&self, uuid: uuid::Uuid) -> Result<()> {
+        self.sched.remove(&uuid).await?;
+        Ok(())
+    }
+
     // For one-off jobs, tokio-cron-scheduler might be overkill or less precise, 
     // but we can use it if we format the time as a cron string or use its other features if available.
     // For now, let's assume CRON support is the main requirement.

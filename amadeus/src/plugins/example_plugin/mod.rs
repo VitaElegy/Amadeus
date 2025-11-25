@@ -63,18 +63,17 @@ impl Plugin for ExamplePlugin {
 
         println!("[ExamplePlugin] 启动中...");
         self.handler.start()?;
-        println!("[ExamplePlugin] 已启动!");
-        Ok(())
-    }
-
-    fn run(&mut self) -> Result<()> {
-        println!("[ExamplePlugin] 运行主要逻辑...");
         
+        // 模拟运行主要逻辑
+        println!("[ExamplePlugin] 运行主要逻辑...");
         // 使用处理器处理数据
         let data = vec!["数据1", "数据2", "数据3"];
+        // Clone handler if needed or ensure thread safety, but here it's simple
+        // For sync logic we can keep it here, or spawn if slow.
         self.handler.process(&data)?;
-        
         println!("[ExamplePlugin] 任务完成!");
+
+        println!("[ExamplePlugin] 已启动!");
         Ok(())
     }
 

@@ -41,7 +41,7 @@ tarpaulin-report.html
 cobertura.xml
 
 # 文档生成
-/doc/
+# /doc/ - 手动维护的文档应该被跟踪
 /docs/target/
 
 # 临时文件

@@ -190,6 +190,13 @@ impl Dispatcher for Iceoryx2Dispatcher {
             return Err(anyhow::anyhow!("分发器未运行"));
         }
 
+        // Prevent echo: do not send messages that originated from iceoryx2 back to iceoryx2
+        if let crate::message::MessageSource::External(ref src) = message.source {
+            if src == "iceoryx2" {
+                return Ok(());
+            }
+        }
+
         // 获取消息发送通道
         let tx = self.message_tx.as_ref()
             .ok_or_else(|| anyhow::anyhow!("消息通道未初始化"))?;

@@ -52,11 +52,7 @@ impl Plugin for WasmPlugin {
         if plugin.function_exists("start") {
             plugin.call::<(), ()>("start", ())?;
         }
-        Ok(())
-    }
-
-    fn run(&mut self) -> Result<()> {
-        let mut plugin = self.plugin.lock().unwrap();
+        // Support 'run' as well if it exists
         if plugin.function_exists("run") {
             plugin.call::<(), ()>("run", ())?;
         }
