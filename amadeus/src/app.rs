@@ -1,4 +1,4 @@
-use crate::message_manager::MessageManager;
+use crate::core::messaging::message_manager::MessageManager;
 use crate::plugin::{Plugin, PluginRegistry};
 use anyhow::Result;
 

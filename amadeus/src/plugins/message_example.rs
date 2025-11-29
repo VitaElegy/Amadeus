@@ -1,8 +1,8 @@
 // amadeus/src/plugins/message_example.rs
 
-use crate::distribution_center::DistributionCenter;
-use crate::message::Message;
-use crate::message_context::MessageContext;
+use crate::core::messaging::distribution_center::DistributionCenter;
+use crate::core::messaging::message::Message;
+use crate::core::messaging::message_context::MessageContext;
 use crate::plugin::{Plugin, PluginMetadata};
 use anyhow::Result;
 use std::sync::Arc;

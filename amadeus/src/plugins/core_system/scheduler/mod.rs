@@ -1,7 +1,7 @@
 use anyhow::Result;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tokio::sync::mpsc;
-use crate::message::Message;
+use crate::core::messaging::message::Message;
 use tracing::{info, error};
 
 pub struct Scheduler {

@@ -3,11 +3,8 @@
 
 // 确保 proc-macro 可用（proc-macro 需要在 crate root 或通过 extern crate 声明）
 #[allow(unused_imports)]
-use iceoryx2::prelude::*;
+pub use iceoryx2::prelude;
 
 pub mod iceoryx2_types;
-pub mod iceoryx2_receiver;
 
 pub use iceoryx2_types::*;
-pub use iceoryx2_receiver::*;
-

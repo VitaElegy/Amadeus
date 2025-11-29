@@ -1,9 +1,14 @@
+pub mod storage;
+pub mod scheduler;
+
 use crate::plugin::{Plugin, PluginMetadata};
-use crate::storage::Storage;
-use crate::scheduler::Scheduler;
-use crate::message::Message;
-use crate::distribution_center::DistributionCenter;
-use crate::message_context::MessageContext;
+use self::storage::Storage;
+use self::scheduler::Scheduler;
+use crate::core::messaging::{
+    Message,
+    DistributionCenter,
+    MessageContext
+};
 use anyhow::Result;
 use std::sync::Arc;
 use std::pin::Pin;

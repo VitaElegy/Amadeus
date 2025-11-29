@@ -1,15 +1,19 @@
-use crate::message::{Message, MessagePriority, MessageType};
-use crate::message_context::MessageContext;
+pub mod ipc;
+
+use crate::core::messaging::{
+    Message, MessagePriority,
+    DistributionCenter,
+    MessageContext,
+};
 use crate::plugin::{Plugin, PluginMetadata, PluginType};
-use crate::ipc::iceoryx2_types::{AmadeusMessageData, service_names};
-use crate::distribution_center::DistributionCenter;
+use self::ipc::iceoryx2_types::{AmadeusMessageData, service_names};
+use self::ipc::prelude::{Service, NodeBuilder, ServiceName};
 use anyhow::Result;
-use iceoryx2::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::pin::Pin;
 use tokio::sync::mpsc as tokio_mpsc;
-use tracing::{info, error, warn};
+use tracing::{info, error};
 
 pub struct Iceoryx2DispatcherPlugin {
     metadata: PluginMetadata,
@@ -109,7 +113,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
         
         self.publisher_thread = Some(std::thread::spawn(move || {
             let result = (|| -> Result<()> {
-                let node = NodeBuilder::new().create::<ipc::Service>()
+                let node = NodeBuilder::new().create::<self::ipc::prelude::ipc::Service>()
                     .map_err(|e| anyhow::anyhow!("Node creation failed: {}", e))?;
                 let service_name_obj = ServiceName::new(&pub_service_name)?;
                 let service = node.service_builder(&service_name_obj)
@@ -145,7 +149,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
 
         self.receiver_thread = Some(std::thread::spawn(move || {
              let result = (|| -> Result<()> {
-                let node = NodeBuilder::new().create::<ipc::Service>()
+                let node = NodeBuilder::new().create::<self::ipc::prelude::ipc::Service>()
                     .map_err(|e| anyhow::anyhow!("Node creation failed: {}", e))?;
                 let service_name_obj = ServiceName::new(&sub_service_name)?;
                 let service = node.service_builder(&service_name_obj)
@@ -163,7 +167,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
                              if let Ok(json_str) = data.json_str() {
                                  if let Ok(msg) = Message::from_json(&json_str) {
                                      // Prevent echo loop: check source
-                                     if let crate::message::MessageSource::Plugin(ref name) = msg.source {
+                                     if let crate::core::messaging::message::MessageSource::Plugin(ref name) = msg.source {
                                          if name == "Iceoryx2Dispatcher" {
                                              continue;
                                          }
@@ -243,7 +247,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
                 tokio::spawn(async move {
                     while let Ok(msg) = rx.recv().await {
                          // Prevent echo: do not forward messages that came from external iceoryx2
-                         if let crate::message::MessageSource::External(ref src) = msg.source {
+                         if let crate::core::messaging::message::MessageSource::External(ref src) = msg.source {
                              // If we had a way to identify if it came from THIS dispatcher node, we could filter better.
                              // But generally, we don't want to echo back what we just received from outside?
                              // Actually, if it's External, it came from some dispatcher.

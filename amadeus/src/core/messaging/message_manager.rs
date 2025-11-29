@@ -1,5 +1,5 @@
-use crate::distribution_center::DistributionCenter;
-use crate::message::Message;
+use super::distribution_center::DistributionCenter;
+use super::message::Message;
 use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -42,7 +42,7 @@ impl MessageManager {
 
     /// 启动消息处理任务
     pub fn start_message_loop(&mut self) {
-        let distribution_center = Arc::clone(&self.distribution_center);
+        let distribution_center: Arc<DistributionCenter> = Arc::clone(&self.distribution_center);
         let mut message_rx = self.message_rx.take().expect("消息接收器已被使用");
 
         let handle = tokio::spawn(async move {

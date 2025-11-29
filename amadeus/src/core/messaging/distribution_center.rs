@@ -1,4 +1,4 @@
-use crate::message::{Message, MessageType};
+use super::message::{Message, MessageType};
 use std::collections::HashMap;
 use tokio::sync::broadcast;
 

@@ -1,18 +1,52 @@
-# Amadeus 文档中心
+# Amadeus
 
-欢迎查阅 Amadeus 文档。这里包含了架构设计、开发指南和未来规划。
+Amadeus 是一个高性能、模块化的 Rust 插件系统框架。它旨在提供一个灵活的基础设施，用于构建复杂的、分布式的应用程序。
 
-## 📚 核心文档
+## 🌟 特性
 
-### [架构设计 (Architecture)](./ARCHITECTURE.md)
-深入了解 Amadeus 的系统设计、消息总线架构、通信机制、生命周期管理以及**项目路线图 (Roadmap)**。
-- **推荐阅读人群**: 核心贡献者、架构师
+*   **双模块核心架构**：精简的 Message/Plugin Center + 强大的插件生态。
+*   **灵活的插件系统**：
+    *   **Native 插件**：Rust 原生编写，高性能。
+    *   **WASM 插件** (开发中)：支持多语言，安全沙盒隔离。
+    *   **特权分级**：支持 `Privileged` 和 `Normal` 插件类型。
+*   **强大的消息总线**：
+    *   **Public 广播**：基于 `tokio::broadcast` 的高效发布/订阅。
+    *   **Direct 定向**：基于 `tokio::mpsc` 的点对点私密通信。
+*   **高性能 IPC**：集成 **Iceoryx2** 实现零拷贝进程间通信（通过特权插件）。
+*   **异步优先**：全链路基于 Tokio 异步运行时。
 
-### [开发者指南 (Developer Guide)](./DEVELOPER_GUIDE.md)
-手把手教你如何编写插件、处理消息以及调试应用。包含了**内置插件参考文档**。
-- **内容包括**: 快速开始、插件开发规范、消息系统使用、最佳实践、内置插件API
-- **推荐阅读人群**: 插件开发者
+## 🚀 快速开始
 
-## 📝 配置参考
+### 运行示例
 
-- [插件配置示例 (JSON)](./plugins_config.example.json)
+```bash
+# 运行消息系统示例
+cargo run --example messaging
+```
+
+### 项目结构
+
+```
+amadeus/
+├── src/
+│   ├── core/           # 核心架构 (消息总线、路由)
+│   ├── plugins/        # 内置插件 (CoreSystem, IPC Dispatcher 等)
+│   ├── app.rs          # 应用入口
+│   └── lib.rs          # 库定义
+└── doc/                # 文档
+    ├── ARCHITECTURE.md # 架构设计
+    └── ...
+```
+
+## 📖 文档
+
+*   [架构设计 (Architecture)](doc/ARCHITECTURE.md)
+*   [开发者指南 (Developer Guide)](doc/DEVELOPER_GUIDE.md)
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 许可证
+
+[MIT License](LICENSE)

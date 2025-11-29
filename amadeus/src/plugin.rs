@@ -1,6 +1,6 @@
-use crate::distribution_center::DistributionCenter;
-use crate::message::Message;
-use crate::message_context::MessageContext;
+use crate::core::messaging::distribution_center::DistributionCenter;
+use crate::core::messaging::message::Message;
+use crate::core::messaging::message_context::MessageContext;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::future::Future;
@@ -312,7 +312,7 @@ impl PluginRegistry {
     /// 设置插件的消息订阅
     pub async fn setup_messaging(
         &mut self,
-        message_manager: &crate::message_manager::MessageManager,
+        message_manager: &crate::core::messaging::message_manager::MessageManager,
     ) -> anyhow::Result<()> {
         tracing::info!("=== 设置插件消息订阅 ===");
         

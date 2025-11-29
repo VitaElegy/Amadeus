@@ -1,5 +1,5 @@
-use crate::distribution_center::DistributionCenter;
-use crate::message::{Message, MessageType};
+use super::distribution_center::DistributionCenter;
+use super::message::{Message, MessageType, MessageSource};
 use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -69,7 +69,7 @@ impl MessageContext {
     /// 消息会被分发中心路由给所有订阅了该消息类型的插件和分发器
     pub async fn send(&self, mut message: Message) -> Result<()> {
         // 确保消息来源设置为当前插件
-        message.source = crate::message::MessageSource::Plugin(self.plugin_name.clone());
+        message.source = MessageSource::Plugin(self.plugin_name.clone());
         
         // 通过通道发送消息
         self.message_tx.send(message).await
