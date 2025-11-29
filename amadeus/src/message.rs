@@ -72,6 +72,8 @@ pub struct Message {
     pub timestamp: u64,
     /// 消息ID（可选，用于追踪）
     pub message_id: Option<String>,
+    /// 接收者ID（可选，None表示广播消息，Some(id)表示定向消息）
+    pub recipient: Option<String>,
     /// 元数据（可选）
     #[serde(default)]
     pub metadata: std::collections::HashMap<String, String>,
@@ -90,6 +92,25 @@ impl Message {
             source: MessageSource::System,
             timestamp: Self::current_timestamp(),
             message_id: None,
+            recipient: None,
+            metadata: std::collections::HashMap::new(),
+        }
+    }
+
+    /// 创建定向消息
+    pub fn new_direct(
+        target_id: impl Into<String>,
+        message_type: impl Into<MessageType>,
+        payload: serde_json::Value,
+    ) -> Self {
+        Self {
+            message_type: message_type.into(),
+            payload,
+            priority: MessagePriority::default(),
+            source: MessageSource::System,
+            timestamp: Self::current_timestamp(),
+            message_id: None,
+            recipient: Some(target_id.into()),
             metadata: std::collections::HashMap::new(),
         }
     }
@@ -107,6 +128,7 @@ impl Message {
             source: MessageSource::External(source.into()),
             timestamp: Self::current_timestamp(),
             message_id: None,
+            recipient: None,
             metadata: std::collections::HashMap::new(),
         }
     }
@@ -124,6 +146,7 @@ impl Message {
             source: MessageSource::Plugin(plugin_name.into()),
             timestamp: Self::current_timestamp(),
             message_id: None,
+            recipient: None,
             metadata: std::collections::HashMap::new(),
         }
     }
@@ -138,6 +161,22 @@ impl Message {
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.message_id = Some(id.into());
         self
+    }
+
+    /// 设置接收者
+    pub fn with_recipient(mut self, recipient: impl Into<String>) -> Self {
+        self.recipient = Some(recipient.into());
+        self
+    }
+
+    /// 判断是否为广播消息
+    pub fn is_public(&self) -> bool {
+        self.recipient.is_none()
+    }
+
+    /// 判断是否为定向消息
+    pub fn is_direct(&self) -> bool {
+        self.recipient.is_some()
     }
 
     /// 添加元数据

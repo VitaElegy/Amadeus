@@ -35,6 +35,10 @@ impl WasmPlugin {
 }
 
 impl Plugin for WasmPlugin {
+    fn id(&self) -> &str {
+        &self.metadata.name
+    }
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }

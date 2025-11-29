@@ -53,6 +53,10 @@ impl CoreSystemPlugin {
 }
 
 impl Plugin for CoreSystemPlugin {
+    fn id(&self) -> &str {
+        &self.metadata.name
+    }
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }

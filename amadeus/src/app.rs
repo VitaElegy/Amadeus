@@ -111,9 +111,6 @@ impl App {
 
             // 启动消息处理循环
             msg_mgr.start_message_loop();
-
-            // 启动分发器
-            msg_mgr.start_dispatchers().await?;
         }
 
         // 执行插件启动流程
@@ -132,7 +129,6 @@ impl App {
         // 停止分发器和消息循环
         if let Some(ref mut msg_mgr) = self.message_manager {
             msg_mgr.stop_message_loop().await;
-            let _ = msg_mgr.stop_dispatchers().await;
         }
 
         if self.show_startup_message {

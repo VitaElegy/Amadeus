@@ -29,6 +29,10 @@ impl MessageExamplePlugin {
 }
 
 impl Plugin for MessageExamplePlugin {
+    fn id(&self) -> &str {
+        &self.metadata.name
+    }
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }

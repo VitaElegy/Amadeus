@@ -36,6 +36,10 @@ impl Default for Code4renaPlugin {
 }
 
 impl Plugin for Code4renaPlugin {
+    fn id(&self) -> &str {
+        &self.metadata.name
+    }
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }

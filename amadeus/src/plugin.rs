@@ -58,9 +58,27 @@ impl PluginMetadata {
     }
 }
 
+/// 插件类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PluginType {
+    /// 特权插件：拥有管理其他插件的权限，优先加载
+    /// 值越小优先级越高，所以 Privileged 应该比 Normal 小
+    Privileged = 0,
+    /// 普通插件：标准功能插件
+    Normal = 1,
+}
+
 /// 插件生命周期 trait
 /// 所有插件必须实现此 trait
 pub trait Plugin: Send + Sync {
+    /// 获取插件唯一标识符
+    fn id(&self) -> &str;
+
+    /// 获取插件类型
+    fn plugin_type(&self) -> PluginType {
+        PluginType::Normal
+    }
+
     /// 获取插件元数据
     fn metadata(&self) -> &PluginMetadata;
 
@@ -142,33 +160,37 @@ impl PluginRegistry {
         Ok(())
     }
 
-    /// 注册一个插件
+    /// 注册一个插件并排序
     pub fn register<P: Plugin + 'static>(&mut self, plugin: P) {
-        tracing::info!("注册插件: {}", plugin.metadata().name);
+        tracing::info!("注册插件: {} [{:?}]", plugin.metadata().name, plugin.plugin_type());
         self.plugins.push(Box::new(plugin));
+        self.sort_plugins();
     }
 
-    /// 批量注册插件列表
+    /// 批量注册插件列表并排序
     pub fn register_all(&mut self, plugins: Vec<Box<dyn Plugin>>) {
         for plugin in plugins {
-            tracing::info!("注册插件: {}", plugin.metadata().name);
+            tracing::info!("注册插件: {} [{:?}]", plugin.metadata().name, plugin.plugin_type());
             self.plugins.push(plugin);
         }
+        self.sort_plugins();
     }
 
-    /// 根据配置有选择地注册插件
+    /// 根据配置有选择地注册插件并排序
     pub fn register_enabled(&mut self, plugins: Vec<Box<dyn Plugin>>) {
         for plugin in plugins {
             let enabled = plugin.metadata().enabled_by_default;
             let name = plugin.metadata().name.clone();
+            let p_type = plugin.plugin_type();
             
             if enabled {
-                tracing::info!("✓ 注册插件: {} [启用]", name);
+                tracing::info!("✓ 注册插件: {} [{:?}] [启用]", name, p_type);
                 self.plugins.push(plugin);
             } else {
-                tracing::info!("✗ 跳过插件: {} [禁用]", name);
+                tracing::info!("✗ 跳过插件: {} [{:?}] [禁用]", name, p_type);
             }
         }
+        self.sort_plugins();
     }
 
     /// 注册匹配名称的插件
@@ -180,6 +202,7 @@ impl PluginRegistry {
                 self.plugins.push(plugin);
             }
         }
+        self.sort_plugins();
     }
 
     /// 注册匹配过滤器的插件
@@ -194,6 +217,12 @@ impl PluginRegistry {
                 self.plugins.push(plugin);
             }
         }
+        self.sort_plugins();
+    }
+
+    /// 对插件进行排序：特权插件优先
+    fn sort_plugins(&mut self) {
+        self.plugins.sort_by(|a, b| a.plugin_type().cmp(&b.plugin_type()));
     }
 
     /// 获取所有插件
@@ -209,6 +238,7 @@ impl PluginRegistry {
     /// 初始化所有插件
     pub fn init_all(&mut self) -> anyhow::Result<&mut Self> {
         tracing::info!("=== 初始化所有插件 ===");
+        // 此时插件已经排序，Privileged 在前
         for plugin in self.plugins.iter_mut() {
             plugin.init()?;
         }
@@ -227,6 +257,7 @@ impl PluginRegistry {
     /// 停止所有插件（按相反顺序）
     pub fn stop_all(&mut self) -> anyhow::Result<&mut Self> {
         tracing::info!("=== 停止所有插件 ===");
+        // 停止时，Normal 先停，Privileged 后停
         for plugin in self.plugins.iter_mut().rev() {
             plugin.stop()?;
         }
@@ -261,10 +292,16 @@ impl PluginRegistry {
         tracing::info!("=== 已注册的插件 ===");
         for (idx, plugin) in self.plugins.iter().enumerate() {
             let meta = plugin.metadata();
+            let p_type = plugin.plugin_type();
+            let type_str = match p_type {
+                PluginType::Privileged => "特权",
+                PluginType::Normal => "普通",
+            };
             tracing::info!(
-                "{}. {} v{} - {} [{}]",
+                "{}. {} [{}] v{} - {} [{}]",
                 idx + 1,
                 meta.name,
+                type_str,
                 meta.version,
                 meta.description,
                 if meta.enabled_by_default { "启用" } else { "禁用" }

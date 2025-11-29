@@ -35,11 +35,33 @@ impl MessageContext {
     /// - `message_type`: 要订阅的消息类型
     /// 
     /// # 返回值
-    /// 返回一个接收器，用于接收该类型的消息
+    /// - 返回一个广播接收器，用于接收该类型的公共消息
     pub async fn subscribe(&self, message_type: impl Into<MessageType>) -> broadcast::Receiver<Message> {
         self.distribution_center
             .subscribe(message_type, &self.plugin_name)
             .await
+    }
+
+    /// 订阅所有公共消息
+    /// 
+    /// # 返回值
+    /// - 返回一个广播接收器，用于接收所有公共消息
+    pub async fn subscribe_all(&self) -> broadcast::Receiver<Message> {
+        self.distribution_center
+            .subscribe_all(&self.plugin_name)
+            .await
+    }
+
+    /// 启用定向消息接收
+    /// 
+    /// 注册当前插件的定向消息通道，允许其他插件向此插件发送私密消息
+    /// 
+    /// # 返回值
+    /// - 返回一个 mpsc 接收器，用于接收定向给此插件的消息
+    pub async fn enable_direct_messaging(&self) -> tokio::sync::mpsc::Receiver<Message> {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        self.distribution_center.register_direct_channel(&self.plugin_name, tx).await;
+        rx
     }
 
     /// 发送消息

@@ -1,7 +1,6 @@
 // Amadeus 插件系统核心库
 
 pub mod app;
-pub mod dispatcher;
 pub mod distribution_center;
 pub mod ipc;
 pub mod message;
@@ -15,7 +14,6 @@ pub mod wasm;
 
 // 重新导出常用类型
 pub use app::App;
-pub use dispatcher::{Dispatcher, DispatcherRegistry};
 pub use distribution_center::DistributionCenter;
 pub use message::{Message, MessageHandleResult, MessagePriority, MessageSource, MessageType};
 pub use message_context::MessageContext;

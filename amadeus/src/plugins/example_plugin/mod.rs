@@ -37,6 +37,10 @@ impl ExamplePlugin {
 }
 
 impl Plugin for ExamplePlugin {
+    fn id(&self) -> &str {
+        &self.metadata.name
+    }
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }

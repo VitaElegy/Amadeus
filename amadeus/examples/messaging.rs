@@ -1,12 +1,11 @@
 // 消息系统使用示例（使用 tokio）
 // 运行: cargo run --example messaging
 
-use amadeus::dispatcher::iceoryx2::Iceoryx2Dispatcher;
-use amadeus::message::Message;
-use amadeus::message_manager::MessageManager;
 use amadeus::App;
+use amadeus::plugins::iceoryx2_dispatcher::Iceoryx2DispatcherPlugin;
+use amadeus::plugins::message_example::MessageExamplePlugin;
+use amadeus::plugin::Plugin;
 use anyhow::Result;
-use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -14,87 +13,16 @@ async fn main() -> Result<()> {
     tracing::info!("=== Amadeus 消息系统示例（使用 tokio）===");
 
     // 创建应用并启用消息系统
-    let mut app = App::new()
-        .with_messaging()
-        .show_metadata(false);
-
-    // 获取消息管理器并注册分发器
-    if let Some(msg_mgr) = app.message_manager_mut() {
-        // 注册 Iceoryx2 分发器
-        let dispatcher = Iceoryx2Dispatcher::new("amadeus_service")
-            .with_name("Iceoryx2分发器");
-        msg_mgr.register_dispatcher(dispatcher).await;
-    }
+    // 我们手动添加插件以展示配置过程
+    let app = App::with_plugins(vec![
+        Box::new(Iceoryx2DispatcherPlugin::new("amadeus_demo")),
+        Box::new(MessageExamplePlugin::new()),
+    ])
+    .with_messaging()
+    .show_metadata(true);
 
     // 运行应用
     app.run_async().await?;
-
-    // 演示消息发送和接收
-    tracing::info!("=== 消息系统演示 ===");
-    demonstrate_messaging().await?;
-
-    Ok(())
-}
-
-async fn demonstrate_messaging() -> Result<()> {
-    let mut msg_mgr = MessageManager::new();
-
-    // 注册一个分发器
-    let dispatcher = Iceoryx2Dispatcher::new("demo_service");
-    msg_mgr.register_dispatcher(dispatcher).await;
-
-    // 启动分发器
-    msg_mgr.start_dispatchers().await?;
-
-    // 启动消息处理循环
-    msg_mgr.start_message_loop();
-
-    // 模拟外部消息到达
-    tracing::info!("1. 模拟外部消息到达...");
-    let external_message = Message::from_external(
-        "command",
-        json!({
-            "action": "process",
-            "data": "test data"
-        }),
-        "external_system",
-    );
-
-    msg_mgr.handle_dispatcher_message(external_message).await?;
-
-    // 等待一下让消息处理
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-    // 模拟插件发送消息
-    tracing::info!("2. 模拟插件发送消息...");
-    let plugin_message = Message::from_plugin(
-        "notification",
-        json!({
-            "type": "status",
-            "content": "处理完成"
-        }),
-        "example_plugin",
-    );
-
-    msg_mgr.handle_plugin_message(plugin_message).await?;
-
-    // 等待一下让消息处理
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-    // 显示订阅统计
-    tracing::info!("3. 订阅统计:");
-    let stats = msg_mgr.distribution_center().get_subscription_stats().await;
-    if stats.is_empty() {
-        tracing::info!("   (暂无订阅)");
-    } else {
-        for (msg_type, count) in stats {
-            tracing::info!("   {}: {} 个订阅者", msg_type, count);
-        }
-    }
-
-    // 停止消息循环和分发器
-    msg_mgr.stop_message_loop().await;
-    msg_mgr.stop_dispatchers().await?;
 
     Ok(())
 }

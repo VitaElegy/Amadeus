@@ -2,12 +2,14 @@ pub mod code4rena;
 pub mod example_plugin;
 pub mod core_system;
 pub mod message_example;
+pub mod iceoryx2_dispatcher;
 
 use crate::plugin::Plugin;
 use code4rena::Code4renaPlugin;
 use example_plugin::ExamplePlugin;
 use core_system::CoreSystemPlugin;
 use message_example::MessageExamplePlugin;
+use iceoryx2_dispatcher::Iceoryx2DispatcherPlugin;
 
 /// 获取所有可用的插件实例
 ///
@@ -17,6 +19,8 @@ pub fn get_all_plugins() -> Vec<Box<dyn Plugin>> {
     vec![
         // Core System Plugin - always active
         Box::new(CoreSystemPlugin::new("sqlite:amadeus.db")),
+        // IPC Dispatcher Plugin - privileged
+        Box::new(Iceoryx2DispatcherPlugin::new("amadeus_node")),
         Box::new(Code4renaPlugin::new()),
         Box::new(ExamplePlugin::new()),
         Box::new(MessageExamplePlugin::new()),
