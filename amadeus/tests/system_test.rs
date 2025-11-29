@@ -1,7 +1,7 @@
 use amadeus::plugin::PluginRegistry;
 use amadeus::plugins::core_system::CoreSystemPlugin;
-use amadeus::message_manager::MessageManager;
-use amadeus::message::Message;
+use amadeus::core::messaging::message_manager::MessageManager;
+use amadeus::core::messaging::message::Message;
 use std::time::Duration;
 
 #[tokio::test]

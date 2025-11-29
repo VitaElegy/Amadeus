@@ -22,6 +22,10 @@ impl TestPlugin {
 }
 
 impl Plugin for TestPlugin {
+    fn id(&self) -> &str {
+        &self.metadata.name
+    }
+
     fn metadata(&self) -> &PluginMetadata {
         &self.metadata
     }
@@ -111,6 +115,7 @@ fn test_plugin_filtering() {
     
     struct DisabledPlugin { meta: PluginMetadata }
     impl Plugin for DisabledPlugin {
+        fn id(&self) -> &str { &self.meta.name }
         fn metadata(&self) -> &PluginMetadata { &self.meta }
     }
     let p2 = DisabledPlugin { meta: p2_meta };

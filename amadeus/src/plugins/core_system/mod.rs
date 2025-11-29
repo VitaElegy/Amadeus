@@ -123,7 +123,7 @@ impl Plugin for CoreSystemPlugin {
                         if let Some(tags_json) = tags_str {
                             if let Ok(tags) = serde_json::from_str::<Vec<String>>(&tags_json) {
                                 if tags.contains(&"stage_goal".to_string()) {
-                                    let daily_cron = "0 0 10 * * * *"; 
+                                    let daily_cron = "0 0 10 * * *"; 
                                     let trigger_msg = Message::new(
                                         "system.memo.remind",
                                         serde_json::json!({ 
