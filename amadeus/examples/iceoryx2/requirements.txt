@@ -1,3 +1,4 @@
 # iceoryx2 Python binding
 # Install from local build or PyPI
 iceoryx2
+cryptography

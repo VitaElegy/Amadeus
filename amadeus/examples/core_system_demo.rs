@@ -34,10 +34,11 @@ impl Plugin for InteractorPlugin {
         tx: mpsc::Sender<Message>,
     ) -> Pin<Box<dyn std::future::Future<Output = Result<Option<Arc<MessageContext>>>> + Send>> {
         let plugin_name = self.metadata.name.clone();
+        let plugin_uid = self.metadata.uid.clone();
         let dc_arc = Arc::new(dc.clone());
 
         Box::pin(async move {
-            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, tx));
+            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, plugin_uid, tx));
             let ctx_clone = ctx.clone();
 
             // 订阅 Core System 的回复

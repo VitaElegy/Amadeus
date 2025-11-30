@@ -43,12 +43,14 @@ impl Plugin for MessageExamplePlugin {
         message_tx: mpsc::Sender<Message>,
     ) -> Pin<Box<dyn std::future::Future<Output = Result<Option<Arc<MessageContext>>>> + Send>> {
         let plugin_name = self.metadata.name.clone();
+        let plugin_uid = self.metadata.uid.clone();
         let dc = Arc::new(distribution_center.clone());
         
         Box::pin(async move {
             let ctx = Arc::new(MessageContext::new(
                 dc,
                 plugin_name,
+                plugin_uid,
                 message_tx,
             ));
             

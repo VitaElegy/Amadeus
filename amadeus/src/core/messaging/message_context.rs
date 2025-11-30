@@ -11,6 +11,7 @@ use tokio::sync::broadcast;
 pub struct MessageContext {
     distribution_center: Arc<DistributionCenter>,
     plugin_name: String,
+    plugin_uid: String,
     /// 消息发送通道（用于发送消息到分发中心）
     message_tx: tokio::sync::mpsc::Sender<Message>,
 }
@@ -20,11 +21,13 @@ impl MessageContext {
     pub fn new(
         distribution_center: Arc<DistributionCenter>,
         plugin_name: impl Into<String>,
+        plugin_uid: impl Into<String>,
         message_tx: tokio::sync::mpsc::Sender<Message>,
     ) -> Self {
         Self {
             distribution_center,
             plugin_name: plugin_name.into(),
+            plugin_uid: plugin_uid.into(),
             message_tx,
         }
     }
@@ -55,12 +58,14 @@ impl MessageContext {
     /// 启用定向消息接收
     /// 
     /// 注册当前插件的定向消息通道，允许其他插件向此插件发送私密消息
+    /// 使用插件的 UID 作为唯一凭证
     /// 
     /// # 返回值
     /// - 返回一个 mpsc 接收器，用于接收定向给此插件的消息
     pub async fn enable_direct_messaging(&self) -> tokio::sync::mpsc::Receiver<Message> {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
-        self.distribution_center.register_direct_channel(&self.plugin_name, tx).await;
+        // 使用 UID 注册定向通道
+        self.distribution_center.register_direct_channel(&self.plugin_uid, tx).await;
         rx
     }
 
@@ -87,6 +92,10 @@ impl MessageContext {
     pub fn plugin_name(&self) -> &str {
         &self.plugin_name
     }
+    /// 获取插件 UID
+    pub fn plugin_uid(&self) -> &str {
+        &self.plugin_uid
+    }
 }
 
 impl Clone for MessageContext {
@@ -94,6 +103,7 @@ impl Clone for MessageContext {
         Self {
             distribution_center: Arc::clone(&self.distribution_center),
             plugin_name: self.plugin_name.clone(),
+            plugin_uid: self.plugin_uid.clone(),
             message_tx: self.message_tx.clone(),
         }
     }

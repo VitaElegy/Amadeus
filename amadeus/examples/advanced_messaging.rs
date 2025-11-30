@@ -34,10 +34,11 @@ impl Plugin for SenderPlugin {
         tx: mpsc::Sender<Message>,
     ) -> Pin<Box<dyn std::future::Future<Output = Result<Option<Arc<MessageContext>>>> + Send>> {
         let plugin_name = self.metadata.name.clone();
+        let plugin_uid = self.metadata.uid.clone();
         let dc_arc = Arc::new(_dc.clone());
         
         Box::pin(async move {
-            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, tx));
+            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, plugin_uid, tx));
             let ctx_clone = ctx.clone();
 
             // 启动发送任务
@@ -94,10 +95,11 @@ impl Plugin for ReceiverPlugin {
         tx: mpsc::Sender<Message>,
     ) -> Pin<Box<dyn std::future::Future<Output = Result<Option<Arc<MessageContext>>>> + Send>> {
         let plugin_name = self.metadata.name.clone();
+        let plugin_uid = self.metadata.uid.clone();
         let dc_arc = Arc::new(dc.clone());
 
         Box::pin(async move {
-            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, tx));
+            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, plugin_uid, tx));
 
             // 1. 订阅广播
             let mut public_rx = ctx.subscribe("demo.public").await;
@@ -146,10 +148,11 @@ impl Plugin for BystanderPlugin {
         tx: mpsc::Sender<Message>,
     ) -> Pin<Box<dyn std::future::Future<Output = Result<Option<Arc<MessageContext>>>> + Send>> {
         let plugin_name = self.metadata.name.clone();
+        let plugin_uid = self.metadata.uid.clone();
         let dc_arc = Arc::new(dc.clone());
 
         Box::pin(async move {
-            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, tx));
+            let ctx = Arc::new(MessageContext::new(dc_arc, plugin_name, plugin_uid, tx));
             
             // 订阅同样的广播话题
             let mut public_rx = ctx.subscribe("demo.public").await;

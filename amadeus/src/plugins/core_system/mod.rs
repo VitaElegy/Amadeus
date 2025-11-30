@@ -79,6 +79,7 @@ impl Plugin for CoreSystemPlugin {
         let db_url = self.db_url.clone();
         let dc = Arc::new(distribution_center.clone());
         let plugin_name = self.metadata.name.clone();
+        let plugin_uid = self.metadata.uid.clone();
         let tx = message_tx.clone();
 
         Box::pin(async move {
@@ -160,6 +161,7 @@ impl Plugin for CoreSystemPlugin {
             let ctx = Arc::new(MessageContext::new(
                 dc,
                 plugin_name,
+                plugin_uid,
                 tx,
             ));
 

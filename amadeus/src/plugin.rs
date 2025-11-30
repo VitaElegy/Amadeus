@@ -24,6 +24,13 @@ pub struct PluginMetadata {
     /// 其他自定义属性
     #[serde(default)]
     pub properties: std::collections::HashMap<String, String>,
+    /// 插件唯一标识符 (运行时生成)
+    #[serde(default = "uuid_v4_string")]
+    pub uid: String,
+}
+
+fn uuid_v4_string() -> String {
+    uuid::Uuid::new_v4().to_string()
 }
 
 impl PluginMetadata {
@@ -36,6 +43,7 @@ impl PluginMetadata {
             enabled_by_default: true,
             author: None,
             properties: std::collections::HashMap::new(),
+            uid: uuid_v4_string(),
         }
     }
 
@@ -73,6 +81,11 @@ pub enum PluginType {
 pub trait Plugin: Send + Sync {
     /// 获取插件唯一标识符
     fn id(&self) -> &str;
+
+    /// 获取插件运行时 UID
+    fn uid(&self) -> &str {
+        &self.metadata().uid
+    }
 
     /// 获取插件类型
     fn plugin_type(&self) -> PluginType {

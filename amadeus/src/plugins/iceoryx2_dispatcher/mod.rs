@@ -14,6 +14,15 @@ use std::sync::{Arc, mpsc};
 use std::pin::Pin;
 use tokio::sync::mpsc as tokio_mpsc;
 use tracing::{info, error};
+use rsa::{Pkcs1v15Encrypt, RsaPublicKey, pkcs8::DecodePublicKey};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use rand::thread_rng;
+
+use aes_gcm::{
+    aead::{Aead, KeyInit, OsRng},
+    Aes256Gcm, Nonce // Or `Aes128Gcm`
+};
+use rand::RngCore;
 
 pub struct Iceoryx2DispatcherPlugin {
     metadata: PluginMetadata,
@@ -52,6 +61,12 @@ impl Iceoryx2DispatcherPlugin {
             publisher_tx: None,
         }
     }
+
+    /// Configure the dispatcher with an external RSA public key for outgoing message encryption.
+    pub fn with_public_key(mut self, public_key_pem: impl Into<String>) -> Self {
+        self.metadata = self.metadata.with_property("external_public_key", &public_key_pem.into());
+        self
+    }
 }
 
 impl Plugin for Iceoryx2DispatcherPlugin {
@@ -78,6 +93,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
         message_tx: tokio_mpsc::Sender<Message>,
     ) -> Pin<Box<dyn std::future::Future<Output = Result<Option<Arc<MessageContext>>>> + Send>> {
         let plugin_name = self.metadata.name.clone();
+        let plugin_uid = self.metadata.uid.clone();
         let dc = Arc::new(distribution_center.clone());
         let tx = message_tx.clone();
         
@@ -85,6 +101,22 @@ impl Plugin for Iceoryx2DispatcherPlugin {
         let node_name = self.node_name.clone();
         let service_name = self.service_name.clone();
         let running = self.running.clone();
+
+        // Load public key for encryption if configured
+        let public_key = if let Some(pem) = self.metadata.properties.get("external_public_key") {
+            match RsaPublicKey::from_public_key_pem(pem) {
+                Ok(k) => {
+                    info!("Loaded external public key for encryption");
+                    Some(k)
+                },
+                Err(e) => {
+                    error!("Failed to parse external public key: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
         
         // We need a way to pass the publisher_tx back to the struct, but setup_messaging consumes &mut self
         // and returns a Future. We can't easily modify self inside the Future if the Future is static.
@@ -95,7 +127,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
         // But `setup_messaging` is for the plugin to subscribe to INTERNAL messages.
         
         // Let's create the internal message context first.
-        let ctx = Arc::new(MessageContext::new(dc, plugin_name.clone(), tx.clone()));
+        let ctx = Arc::new(MessageContext::new(dc, plugin_name.clone(), plugin_uid, tx.clone()));
         let ctx_clone = ctx.clone();
 
         // Create a channel for the publisher thread
@@ -108,7 +140,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
 
         // Start Publisher Thread (Sends internal messages to External Iceoryx2)
         let pub_running = running.clone();
-        let pub_node_name = node_name.clone();
+        let _pub_node_name = node_name.clone();
         let pub_service_name = service_name.clone();
         
         self.publisher_thread = Some(std::thread::spawn(move || {
@@ -143,7 +175,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
 
         // Start Receiver Thread (Receives External Iceoryx2 messages and forwards to Internal)
         let sub_running = running.clone();
-        let sub_node_name = node_name.clone();
+        let _sub_node_name = node_name.clone();
         let sub_service_name = service_name.clone();
         let internal_tx = tx.clone(); // Clone channel to send to MessageManager
 
@@ -248,18 +280,52 @@ impl Plugin for Iceoryx2DispatcherPlugin {
                     while let Ok(msg) = rx.recv().await {
                          // Prevent echo: do not forward messages that came from external iceoryx2
                          if let crate::core::messaging::message::MessageSource::External(ref src) = msg.source {
-                             // If we had a way to identify if it came from THIS dispatcher node, we could filter better.
-                             // But generally, we don't want to echo back what we just received from outside?
-                             // Actually, if it's External, it came from some dispatcher.
-                             // If it came from THIS dispatcher (plugin name), we shouldn't forward it back.
-                             // But MessageSource::External stores a string source.
                              if src == "iceoryx2" {
                                  continue;
                              }
                          }
                          
                          // Prepare data for iceoryx2
-                         if let Ok(json) = msg.to_json() {
+                         if let Ok(mut json) = msg.to_json() {
+                             // Encrypt if public key is available
+                             if let Some(pub_key) = &public_key {
+                                 // Hybrid Encryption
+                                 // 1. Generate random AES key (32 bytes for AES-256)
+                                 let key = Aes256Gcm::generate_key(&mut OsRng);
+                                 let cipher = Aes256Gcm::new(&key);
+                                 
+                                 // 2. Generate random Nonce (12 bytes)
+                                 let mut nonce_bytes = [0u8; 12];
+                                 OsRng.fill_bytes(&mut nonce_bytes);
+                                 let nonce = Nonce::from_slice(&nonce_bytes); // 96-bits; unique per message
+
+                                 // 3. Encrypt payload with AES-GCM
+                                 match cipher.encrypt(nonce, json.as_bytes()) {
+                                    Ok(encrypted_payload) => {
+                                        // 4. Encrypt AES key with RSA
+                                        let mut rng = thread_rng();
+                                        match pub_key.encrypt(&mut rng, Pkcs1v15Encrypt, key.as_slice()) {
+                                            Ok(encrypted_key) => {
+                                                // 5. Construct final JSON
+                                                json = serde_json::json!({
+                                                    "secure_key": BASE64.encode(encrypted_key),
+                                                    "iv": BASE64.encode(nonce_bytes),
+                                                    "secure_payload": BASE64.encode(encrypted_payload)
+                                                }).to_string();
+                                            },
+                                            Err(e) => {
+                                                error!("RSA Encryption of session key failed: {}", e);
+                                                continue;
+                                            }
+                                        }
+                                    },
+                                    Err(e) => {
+                                        error!("AES Encryption failed: {}", e);
+                                        continue;
+                                    }
+                                 }
+                             }
+
                              let priority = match msg.priority {
                                 MessagePriority::Low => 0,
                                 MessagePriority::Normal => 1,
@@ -273,12 +339,7 @@ impl Plugin for Iceoryx2DispatcherPlugin {
                                 priority,
                                 msg.timestamp,
                             ) {
-                                // Send to publisher thread (blocking send ok here? No, async context)
-                                // We need an async sender or use spawn_blocking.
-                                // But our channel to publisher thread is std::sync::mpsc.
-                                // We should use tokio::sync::mpsc or use spawn_blocking.
-                                // The publisher thread uses std::sync::mpsc::Receiver.
-                                // We can wrap the send in spawn_blocking.
+                                // Send to publisher thread
                                 let pub_tx_for_task = pub_tx.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
                                     let _ = pub_tx_for_task.send(data);
