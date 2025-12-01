@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::core::UserContext;
 
 /// 消息类型标识符
 /// 插件通过消息类型来订阅感兴趣的消息
@@ -77,6 +78,8 @@ pub struct Message {
     /// 元数据（可选）
     #[serde(default)]
     pub metadata: std::collections::HashMap<String, String>,
+    /// 用户上下文（可选，用于权限控制）
+    pub user_context: Option<UserContext>,
 }
 
 impl Message {
@@ -94,6 +97,7 @@ impl Message {
             message_id: None,
             recipient: None,
             metadata: std::collections::HashMap::new(),
+            user_context: None,
         }
     }
 
@@ -112,6 +116,7 @@ impl Message {
             message_id: None,
             recipient: Some(target_id.into()),
             metadata: std::collections::HashMap::new(),
+            user_context: None,
         }
     }
 
@@ -130,6 +135,7 @@ impl Message {
             message_id: None,
             recipient: None,
             metadata: std::collections::HashMap::new(),
+            user_context: None,
         }
     }
 
@@ -148,6 +154,7 @@ impl Message {
             message_id: None,
             recipient: None,
             metadata: std::collections::HashMap::new(),
+            user_context: None,
         }
     }
 
@@ -182,6 +189,12 @@ impl Message {
     /// 添加元数据
     pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.metadata.insert(key.into(), value.into());
+        self
+    }
+
+    /// 设置用户上下文
+    pub fn with_user(mut self, user: UserContext) -> Self {
+        self.user_context = Some(user);
         self
     }
 
