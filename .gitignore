@@ -1,2 +1,14 @@
 /amadeus/target
 /iceoryx2
+**/.DS_Store
+**/node_modules
+**/target
+**/*.class
+**/.idea
+**/*.iml
+**/dist
+**/*.log
+__pycache__
+*.pyc
+amadeus/amadeus.db
+amadeus/examples/iceoryx2/__pycache__

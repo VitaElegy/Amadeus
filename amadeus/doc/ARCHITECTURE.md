@@ -10,6 +10,7 @@
 - [代码优化](#代码优化)
 - [文件结构](#文件结构)
 - [项目路线图](#项目路线图-roadmap)
+- [企业级集成](#企业级集成-enterprise-integration)
 
 ---
 
@@ -212,3 +213,18 @@ graph TD
 #### Phase 3: 交互层 (未来规划)
 - [ ] **Tauri 集成**: 构建跨平台 GUI。
 - [ ] **API 层**: 实现前端 UI 与 Core 的通信接口。
+
+---
+
+## 企业级集成 (Enterprise Integration)
+
+为了适应企业级应用场景，Amadeus 支持通过 FFI/JNA 方式集成到传统的 Java/Web 技术栈中。
+
+### 架构组件
+*   **amadeus-web**: 基于 Vue 3 + Vite + Pinia 的现代化前端 Dashboard。
+*   **amadeus-server**: 基于 Spring Boot 3 + JNA 的中间件层。
+
+### 集成方式
+Spring Boot 后端通过 `JNA (Java Native Access)` 加载 Amadeus 编译生成的动态库 (`.so` / `.dylib`)，作为本机接口调用 Core 的能力，并将其转化为 REST API 暴露给前端。
+
+详细文档参见项目根目录下的 `README_INTEGRATION.md`。
