@@ -6,6 +6,7 @@
 
 - [系统架构](#系统架构)
 - [通信机制](#通信机制)
+- [函数调用链与流程图](#函数调用链与流程图)
 - [技术栈](#技术栈)
 - [代码优化](#代码优化)
 - [文件结构](#文件结构)
@@ -134,6 +135,239 @@ Amadeus 采用**双模块设计**：核心（Message/Plugin Center）+ 插件（
 
 ---
 
+## 函数调用链与流程图
+
+### 函数调用链
+
+Amadeus 系统的完整函数调用链如下：
+
+```
+main()
+  └─> App::new()
+      └─> PluginRegistry::with_enabled_plugins()
+          └─> get_all_plugins()
+              ├─> CoreSystemPlugin::new()
+              ├─> Iceoryx2DispatcherPlugin::new()
+              ├─> Code4renaPlugin::new()
+              ├─> ExamplePlugin::new()
+              └─> MessageExamplePlugin::new()
+      └─> App::run()
+          └─> App::run_async()
+              ├─> PluginRegistry::list_plugins()
+              ├─> PluginRegistry::export_metadata() [可选]
+              ├─> App::with_messaging() [如果启用]
+              │   └─> MessageManager::new()
+              │       └─> DistributionCenter::new()
+              ├─> PluginRegistry::setup_messaging()
+              │   └─> Plugin::setup_messaging() [每个插件]
+              │       └─> MessageContext::new()
+              │           ├─> DistributionCenter::subscribe()
+              │           └─> DistributionCenter::register_direct_channel()
+              ├─> MessageManager::start_message_loop()
+              │   └─> MessageManager::message_loop_task()
+              │       ├─> DistributionCenter::send_direct() [定向消息]
+              │       └─> DistributionCenter::distribute() [广播消息]
+              ├─> PluginRegistry::startup()
+              │   ├─> PluginRegistry::init_all()
+              │   │   └─> Plugin::init() [每个插件]
+              │   └─> PluginRegistry::start_all()
+              │       └─> Plugin::start() [每个插件]
+              ├─> tokio::signal::ctrl_c() [等待停止信号]
+              ├─> PluginRegistry::shutdown()
+              │   └─> PluginRegistry::stop_all()
+              │       └─> Plugin::stop() [每个插件，逆序]
+              └─> MessageManager::stop_message_loop()
+```
+
+### 系统架构流程图
+
+```mermaid
+graph TB
+    Start([程序启动]) --> Main[main函数]
+    Main --> AppNew[App::new<br/>创建应用实例]
+    
+    AppNew --> GetPlugins[get_all_plugins<br/>获取所有插件]
+    GetPlugins --> CreatePlugins[创建插件实例<br/>CoreSystem/Iceoryx2/Code4rena等]
+    CreatePlugins --> Registry[PluginRegistry<br/>注册插件并排序]
+    
+    Registry --> AppRun[App::run<br/>运行应用]
+    AppRun --> RunAsync[App::run_async<br/>异步运行]
+    
+    RunAsync --> ListPlugins[列出已注册插件]
+    ListPlugins --> CheckMessaging{是否启用<br/>消息系统?}
+    
+    CheckMessaging -->|是| CreateMsgMgr[MessageManager::new<br/>创建消息管理器]
+    CheckMessaging -->|否| SetupPlugins[设置插件消息订阅]
+    
+    CreateMsgMgr --> CreateDC[DistributionCenter::new<br/>创建分发中心]
+    CreateDC --> SetupPlugins
+    
+    SetupPlugins --> SetupMsg[PluginRegistry::setup_messaging<br/>为每个插件设置消息订阅]
+    SetupMsg --> PluginSetup[Plugin::setup_messaging<br/>每个插件订阅消息类型]
+    PluginSetup --> CreateCtx[MessageContext::new<br/>创建消息上下文]
+    CreateCtx --> Subscribe[订阅消息类型<br/>subscribe/subscribe_all]
+    
+    Subscribe --> StartLoop[MessageManager::start_message_loop<br/>启动消息处理循环]
+    StartLoop --> MsgLoop[消息循环任务<br/>接收并分发消息]
+    
+    MsgLoop --> CheckMsgType{消息类型?}
+    CheckMsgType -->|定向消息| DirectMsg[DistributionCenter::send_direct<br/>发送给指定插件]
+    CheckMsgType -->|广播消息| BroadcastMsg[DistributionCenter::distribute<br/>广播给所有订阅者]
+    
+    DirectMsg --> PluginHandle[插件处理消息]
+    BroadcastMsg --> PluginHandle
+    
+    PluginHandle --> Startup[PluginRegistry::startup<br/>启动所有插件]
+    Startup --> InitAll[init_all<br/>初始化所有插件]
+    InitAll --> InitPlugin[Plugin::init<br/>每个插件初始化]
+    
+    InitPlugin --> StartAll[start_all<br/>启动所有插件]
+    StartAll --> StartPlugin[Plugin::start<br/>每个插件启动]
+    
+    StartPlugin --> Running[系统运行中<br/>等待Ctrl+C信号]
+    
+    Running --> Signal[收到停止信号]
+    Signal --> Shutdown[PluginRegistry::shutdown<br/>关闭所有插件]
+    Shutdown --> StopAll[stop_all<br/>停止所有插件<br/>逆序执行]
+    StopAll --> StopPlugin[Plugin::stop<br/>每个插件停止]
+    
+    StopPlugin --> StopLoop[MessageManager::stop_message_loop<br/>停止消息循环]
+    StopLoop --> End([程序结束])
+    
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style Running fill:#87CEEB
+    style MsgLoop fill:#FFD700
+    style PluginHandle fill:#DDA0DD
+```
+
+### 消息系统详细流程图
+
+```mermaid
+sequenceDiagram
+    participant Main as main函数
+    participant App as App
+    participant Registry as PluginRegistry
+    participant Plugin as 插件
+    participant MsgMgr as MessageManager
+    participant DC as DistributionCenter
+    participant Ctx as MessageContext
+    
+    Main->>App: App::new()
+    App->>Registry: with_enabled_plugins()
+    Registry->>Plugin: 创建插件实例
+    
+    Main->>App: App::run()
+    App->>App: run_async()
+    
+    App->>MsgMgr: MessageManager::new()
+    MsgMgr->>DC: DistributionCenter::new()
+    
+    App->>Registry: setup_messaging()
+    Registry->>Plugin: setup_messaging()
+    Plugin->>Ctx: MessageContext::new()
+    Ctx->>DC: subscribe(message_type)
+    Ctx->>DC: register_direct_channel()
+    
+    App->>MsgMgr: start_message_loop()
+    MsgMgr->>MsgMgr: spawn消息处理任务
+    
+    App->>Registry: startup()
+    Registry->>Plugin: init()
+    Registry->>Plugin: start()
+    
+    Note over Plugin,DC: 运行时消息流
+    
+    Plugin->>Ctx: send(message)
+    Ctx->>MsgMgr: message_tx.send()
+    MsgMgr->>DC: distribute() 或 send_direct()
+    DC->>Plugin: 通过receiver接收消息
+    Plugin->>Plugin: 处理消息
+    
+    Note over App: 收到Ctrl+C信号
+    
+    App->>Registry: shutdown()
+    Registry->>Plugin: stop()
+    App->>MsgMgr: stop_message_loop()
+```
+
+### 核心组件关系图
+
+```mermaid
+graph LR
+    subgraph "应用层"
+        App[App<br/>应用构建器]
+        Main[main.rs<br/>入口点]
+    end
+    
+    subgraph "插件管理层"
+        Registry[PluginRegistry<br/>插件注册表]
+        PluginTrait[Plugin Trait<br/>插件接口]
+    end
+    
+    subgraph "消息系统"
+        MsgMgr[MessageManager<br/>消息管理器]
+        DC[DistributionCenter<br/>分发中心]
+        Ctx[MessageContext<br/>消息上下文]
+        Msg[Message<br/>消息结构]
+    end
+    
+    subgraph "插件实例"
+        Core[CoreSystemPlugin]
+        Iceoryx[Iceoryx2DispatcherPlugin]
+        Code4rena[Code4renaPlugin]
+        Example[ExamplePlugin]
+    end
+    
+    Main --> App
+    App --> Registry
+    Registry --> PluginTrait
+    PluginTrait --> Core
+    PluginTrait --> Iceoryx
+    PluginTrait --> Code4rena
+    PluginTrait --> Example
+    
+    App --> MsgMgr
+    MsgMgr --> DC
+    PluginTrait --> Ctx
+    Ctx --> DC
+    Ctx --> Msg
+    DC --> Msg
+    
+    MsgMgr -.消息路由.-> DC
+    DC -.消息分发.-> Ctx
+    Ctx -.消息发送.-> MsgMgr
+    
+    style App fill:#90EE90
+    style MsgMgr fill:#FFD700
+    style DC fill:#87CEEB
+    style PluginTrait fill:#DDA0DD
+```
+
+### 关键函数调用说明
+
+#### 1. 应用启动流程
+- `main()` → `App::new()` → `App::run()` → `App::run_async()`
+- 创建应用实例，初始化插件注册表，启动异步运行时
+
+#### 2. 插件加载流程
+- `get_all_plugins()` → 创建插件实例 → `PluginRegistry::register_enabled()` → `sort_plugins()`
+- 按优先级排序插件（Privileged 优先于 Normal）
+
+#### 3. 消息系统初始化
+- `MessageManager::new()` → `DistributionCenter::new()` → `Plugin::setup_messaging()` → `MessageContext::new()`
+- 为每个插件创建消息上下文，订阅感兴趣的消息类型
+
+#### 4. 消息处理流程
+- **插件发送消息**: `MessageContext::send()` → `MessageManager::message_tx` → `MessageManager::message_loop_task()` → `DistributionCenter::distribute()` 或 `send_direct()`
+- **插件接收消息**: `DistributionCenter::subscribe()` → `broadcast::Receiver` → 插件异步处理消息
+
+#### 5. 插件生命周期
+- `init()` → `setup_messaging()` → `start()` → [运行] → `stop()`
+- 启动时按优先级顺序执行，停止时逆序执行
+
+---
+
 ## 文件结构
 
 ```
@@ -167,20 +401,20 @@ amadeus/src/
 
 ```mermaid
 graph TD
-    User[用户前端 (Tauri/TUI)] <--> API[API Layer]
+    User[用户前端 Tauri/TUI] <--> API[API Layer]
     
-    subgraph Core System
-        MsgBus[异步消息总线 (Tokio MPSC/Broadcast)]
-        Scheduler[时间调度器 (Tokio-Cron)]
-        DB[(持久化存储 (SQLite))]
+    subgraph "Core System"
+        MsgBus[异步消息总线 Tokio MPSC/Broadcast]
+        Scheduler[时间调度器 Tokio-Cron]
+        DB[(持久化存储 SQLite)]
     end
     
-    subgraph Plugin Host
+    subgraph "Plugin Host"
         NativePlugins[Core Native Plugins]
-        WasmRuntime[WASM Runtime (Extism)]
+        WasmRuntime[WASM Runtime Extism]
     end
     
-    subgraph External IPC
+    subgraph "External IPC"
         Iceoryx2[Iceoryx2 Gateway]
     end
     
